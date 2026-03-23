@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${1:-1.0.4}"
+VERSION="${1:-1.0.5}"
 ARCH="aarch64_cortex-a72"
 OUTPUT_DIR="$(pwd)/dist"
 WORK="/tmp/ipk-build-$$"

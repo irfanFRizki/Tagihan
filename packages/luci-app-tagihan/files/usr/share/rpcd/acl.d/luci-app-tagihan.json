@@ -1,11 +1,7 @@
 {
     "luci-app-tagihan": {
         "description": "Grant UCI access for tagihan",
-        "read": {
-            "uci": [ "tagihan" ]
-        },
-        "write": {
-            "uci": [ "tagihan" ]
-        }
+        "read":  { "uci": ["tagihan"] },
+        "write": { "uci": ["tagihan"] }
     }
 }

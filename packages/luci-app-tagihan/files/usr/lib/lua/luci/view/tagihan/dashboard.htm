@@ -1,289 +1,139 @@
 <%+header%>
 <style>
-.tagihan-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
-    margin: 16px 0;
-}
-.tagihan-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
-}
-.tagihan-card.disabled { opacity: .55; }
-.card-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    border-bottom: 2px solid #f0f0f0;
-    padding-bottom: 10px;
-}
-.card-icon { font-size: 28px; }
-.card-title { font-size: 15px; font-weight: 700; color: #333; }
-.card-subtitle { font-size: 12px; color: #888; }
-.tagihan-amount {
-    font-size: 24px;
-    font-weight: 800;
-    color: #e74c3c;
-    margin: 8px 0;
-}
-.tagihan-amount.lunas { color: #27ae60; }
-.card-meta { font-size: 12px; color: #666; margin: 4px 0; }
-.status-badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-}
-.status-ok      { background: #d4edda; color: #155724; }
-.status-error   { background: #f8d7da; color: #721c24; }
-.status-disabled{ background: #e2e3e5; color: #383d41; }
-.status-loading { background: #fff3cd; color: #856404; }
-.btn-refresh {
-    margin-top: 12px;
-    padding: 6px 14px;
-    background: #3498db;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 12px;
-}
-.btn-refresh:hover { background: #2980b9; }
-.btn-refresh-all {
-    margin: 0 0 16px 0;
-    padding: 8px 20px;
-    background: #2ecc71;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-}
-#last-check { font-size: 12px; color: #888; margin-left: 10px; }
-#log-output {
-    background: #1a1a2e;
-    color: #0ff;
-    font-family: monospace;
-    font-size: 12px;
-    padding: 10px;
-    border-radius: 6px;
-    max-height: 120px;
-    overflow-y: auto;
-    display: none;
-    margin-top: 10px;
-}
+.tagihan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:16px 0}
+.tagihan-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tagihan-card.disabled{opacity:.55}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;border-bottom:2px solid #f0f0f0;padding-bottom:10px}
+.card-icon{font-size:28px}
+.card-title{font-size:15px;font-weight:700;color:#333}
+.card-subtitle{font-size:12px;color:#888}
+.tagihan-amount{font-size:24px;font-weight:800;color:#e74c3c;margin:8px 0}
+.card-meta{font-size:12px;color:#666;margin:4px 0}
+.status-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:auto}
+.status-ok{background:#d4edda;color:#155724}
+.status-error{background:#f8d7da;color:#721c24}
+.status-disabled,.status-belum_dicek{background:#e2e3e5;color:#383d41}
+.status-loading{background:#fff3cd;color:#856404}
+.btn-refresh{margin-top:10px;padding:6px 14px;background:#3498db;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px}
+.btn-refresh:hover{background:#2980b9}
+.btn-all{margin-bottom:16px;padding:9px 22px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
+#last-check{font-size:12px;color:#888;margin-left:12px}
+#log-box{background:#1a1a2e;color:#0ff;font-family:monospace;font-size:12px;padding:10px;border-radius:6px;max-height:100px;overflow-y:auto;display:none;margin-top:10px;white-space:pre-wrap}
 </style>
 
 <h2><%:Tagihan Bot — Dashboard%></h2>
-
-<button class="btn-refresh-all" onclick="refreshAll()">
-    🔄 <%:Refresh Semua Tagihan%>
-</button>
+<button class="btn-all" onclick="doRefresh('all')">🔄 <%:Refresh Semua%></button>
 <span id="last-check"></span>
+<div id="log-box"></div>
 
 <div class="tagihan-grid">
 
-<%-- ═══ Kartu PLN ════════════════════════════════ --%>
-<div class="tagihan-card <%=(data.pln.enabled=="0") and "disabled" or ""%>" id="card-pln">
-    <div class="card-header">
-        <span class="card-icon">⚡</span>
-        <div>
-            <div class="card-title"><%:PLN Pascabayar%></div>
-            <div class="card-subtitle"><%:Tagihan Listrik%></div>
-        </div>
-        <span class="status-badge status-<%=data.pln.status%>" id="badge-pln">
-            <%=data.pln.status%>
-        </span>
-    </div>
-    <% if data.pln.enabled == "1" then %>
-        <% if data.pln.status == "ok" then %>
-            <div class="card-meta">👤 <%=data.pln.nama%></div>
-            <div class="card-meta">🔌 <%=data.pln.daya%> VA — Tarif <%=data.pln.tarif%></div>
-            <div class="tagihan-amount" id="amount-pln">
-                Rp <%=string.format("%s", data.pln.tagihan):gsub("(%d)(%d%d%d)$","%1.%2"):gsub("(%d)(%d%d%d)%.","%1.%2.")%>
-            </div>
-            <div class="card-meta">📅 Periode: <%=data.pln.periode%></div>
-        <% elseif data.pln.status == "error" then %>
-            <div style="color:#e74c3c; font-size:13px;">❌ Gagal mengambil data</div>
-        <% else %>
-            <div style="color:#888; font-size:13px;">⏳ Belum dicek</div>
-        <% end %>
-        <div class="card-meta" style="font-size:11px;">
-            ID: <%=data.pln.idpel%>
-        </div>
+<%-- PLN --%>
+<div class="tagihan-card <%=(data.pln.enabled=="0") and "disabled" or ""%>">
+  <div class="card-header">
+    <span class="card-icon">⚡</span>
+    <div><div class="card-title">PLN Pascabayar</div><div class="card-subtitle">Tagihan Listrik</div></div>
+    <span class="status-badge status-<%=data.pln.status%>" id="b-pln"><%=data.pln.status%></span>
+  </div>
+  <% if data.pln.enabled=="1" then %>
+    <% if data.pln.status=="ok" then %>
+      <div class="card-meta">👤 <%=data.pln.nama%></div>
+      <div class="card-meta">🔌 <%=data.pln.daya%> VA &mdash; <%=data.pln.tarif%></div>
+      <div class="tagihan-amount" id="a-pln">Rp <%=tostring(data.pln.tagihan)%></div>
+      <div class="card-meta">📅 <%=data.pln.periode%></div>
+    <% elseif data.pln.status=="error" then %>
+      <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
     <% else %>
-        <div style="color:#aaa; font-size:13px;">Belum dikonfigurasi.<br>
-            <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">
-                Buka Pengaturan →
-            </a>
-        </div>
+      <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
-    <button class="btn-refresh" onclick="refreshSingle('pln')">🔄 Refresh</button>
+    <div class="card-meta" style="font-size:11px;margin-top:8px">ID: <%=data.pln.idpel%></div>
+  <% else %>
+    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi &mdash; <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
+  <% end %>
+  <button class="btn-refresh" onclick="doRefresh('pln')">🔄 Refresh</button>
 </div>
 
-<%-- ═══ Kartu PDAM ═════════════════════════════════ --%>
-<div class="tagihan-card <%=(data.pdam.enabled=="0") and "disabled" or ""%>" id="card-pdam">
-    <div class="card-header">
-        <span class="card-icon">💧</span>
-        <div>
-            <div class="card-title"><%:PDAM Jakarta%></div>
-            <div class="card-subtitle"><%:PAM Jaya — Tagihan Air%></div>
-        </div>
-        <span class="status-badge status-<%=data.pdam.status%>" id="badge-pdam">
-            <%=data.pdam.status%>
-        </span>
-    </div>
-    <% if data.pdam.enabled == "1" then %>
-        <% if data.pdam.status == "ok" then %>
-            <div class="card-meta">👤 <%=data.pdam.nama%></div>
-            <div class="tagihan-amount" id="amount-pdam">
-                Rp <%=string.format("%s", data.pdam.tagihan):gsub("(%d)(%d%d%d)$","%1.%2"):gsub("(%d)(%d%d%d)%.","%1.%2.")%>
-            </div>
-            <div class="card-meta">📅 Periode: <%=data.pdam.periode%></div>
-            <div class="card-meta">🚿 Pemakaian: <%=data.pdam.pemakaian%> m³</div>
-        <% elseif data.pdam.status == "error" then %>
-            <div style="color:#e74c3c; font-size:13px;">❌ Gagal mengambil data</div>
-        <% else %>
-            <div style="color:#888; font-size:13px;">⏳ Belum dicek</div>
-        <% end %>
-        <div class="card-meta" style="font-size:11px;">
-            No. Pelanggan: <%=data.pdam.nomor_pelanggan%>
-        </div>
+<%-- PDAM --%>
+<div class="tagihan-card <%=(data.pdam.enabled=="0") and "disabled" or ""%>">
+  <div class="card-header">
+    <span class="card-icon">💧</span>
+    <div><div class="card-title">PDAM Jakarta</div><div class="card-subtitle">PAM Jaya — Tagihan Air</div></div>
+    <span class="status-badge status-<%=data.pdam.status%>" id="b-pdam"><%=data.pdam.status%></span>
+  </div>
+  <% if data.pdam.enabled=="1" then %>
+    <% if data.pdam.status=="ok" then %>
+      <div class="card-meta">👤 <%=data.pdam.nama%></div>
+      <div class="tagihan-amount" id="a-pdam">Rp <%=tostring(data.pdam.tagihan)%></div>
+      <div class="card-meta">📅 <%=data.pdam.periode%></div>
+      <div class="card-meta">🚿 <%=data.pdam.pemakaian%> m³</div>
+    <% elseif data.pdam.status=="error" then %>
+      <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
     <% else %>
-        <div style="color:#aaa; font-size:13px;">Belum dikonfigurasi.<br>
-            <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">
-                Buka Pengaturan →
-            </a>
-        </div>
+      <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
-    <button class="btn-refresh" onclick="refreshSingle('pdam')">🔄 Refresh</button>
+    <div class="card-meta" style="font-size:11px;margin-top:8px">No: <%=data.pdam.nomor_pelanggan%></div>
+  <% else %>
+    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi &mdash; <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
+  <% end %>
+  <button class="btn-refresh" onclick="doRefresh('pdam')">🔄 Refresh</button>
 </div>
 
-<%-- ═══ Kartu WiFi ══════════════════════════════════ --%>
-<div class="tagihan-card <%=(data.wifi.enabled=="0") and "disabled" or ""%>" id="card-wifi">
-    <div class="card-header">
-        <span class="card-icon">📶</span>
-        <div>
-            <div class="card-title"><%:WiFi MyRepublic%></div>
-            <div class="card-subtitle"><%:Tagihan Internet%></div>
-        </div>
-        <span class="status-badge status-<%=data.wifi.status%>" id="badge-wifi">
-            <%=data.wifi.status%>
-        </span>
-    </div>
-    <% if data.wifi.enabled == "1" then %>
-        <% if data.wifi.status == "ok" then %>
-            <div class="card-meta">📦 <%=data.wifi.nama_paket%></div>
-            <div class="tagihan-amount" id="amount-wifi">
-                Rp <%=string.format("%s", data.wifi.tagihan):gsub("(%d)(%d%d%d)$","%1.%2"):gsub("(%d)(%d%d%d)%.","%1.%2.")%>
-            </div>
-            <div class="card-meta">📅 Jatuh Tempo: <%=data.wifi.jatuh_tempo%></div>
-        <% elseif data.wifi.status == "error" then %>
-            <div style="color:#e74c3c; font-size:13px;">❌ Gagal mengambil data</div>
-        <% else %>
-            <div style="color:#888; font-size:13px;">⏳ Belum dicek</div>
-        <% end %>
+<%-- WiFi --%>
+<div class="tagihan-card <%=(data.wifi.enabled=="0") and "disabled" or ""%>">
+  <div class="card-header">
+    <span class="card-icon">📶</span>
+    <div><div class="card-title">WiFi MyRepublic</div><div class="card-subtitle">Tagihan Internet</div></div>
+    <span class="status-badge status-<%=data.wifi.status%>" id="b-wifi"><%=data.wifi.status%></span>
+  </div>
+  <% if data.wifi.enabled=="1" then %>
+    <% if data.wifi.status=="ok" then %>
+      <div class="card-meta">📦 <%=data.wifi.nama_paket%></div>
+      <div class="tagihan-amount" id="a-wifi">Rp <%=tostring(data.wifi.tagihan)%></div>
+      <div class="card-meta">📅 Jatuh tempo: <%=data.wifi.jatuh_tempo%></div>
+    <% elseif data.wifi.status=="error" then %>
+      <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
     <% else %>
-        <div style="color:#aaa; font-size:13px;">Belum dikonfigurasi.<br>
-            <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">
-                Buka Pengaturan →
-            </a>
-        </div>
+      <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
-    <button class="btn-refresh" onclick="refreshSingle('wifi')">🔄 Refresh</button>
+  <% else %>
+    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi &mdash; <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
+  <% end %>
+  <button class="btn-refresh" onclick="doRefresh('wifi')">🔄 Refresh</button>
 </div>
 
-</div><!-- /.tagihan-grid -->
-
-<div id="log-output"></div>
+</div>
 
 <script>
-var pollTimer = null;
-
-function refreshAll() {
-    startRefresh('all');
-}
-
-function refreshSingle(target) {
-    startRefresh(target);
-}
-
-function startRefresh(target) {
-    document.getElementById('last-check').textContent = '⏳ Sedang mengecek...';
-    if (target === 'all' || target === 'pln') setBadge('pln', 'loading');
-    if (target === 'all' || target === 'pdam') setBadge('pdam', 'loading');
-    if (target === 'all' || target === 'wifi') setBadge('wifi', 'loading');
-
-    var log = document.getElementById('log-output');
-    log.style.display = 'block';
-    log.textContent = '> Memulai pengecekan ' + target + '...\n';
-
-    fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/refresh")%>?target=' + target)
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-            log.textContent += '> Job dimulai: ' + d.target + '\n';
-            // Poll status setiap 3 detik, max 60 detik
-            var tries = 0;
-            pollTimer = setInterval(function(){
-                tries++;
-                pollStatus(target, log);
-                if (tries >= 20) {
-                    clearInterval(pollTimer);
-                    document.getElementById('last-check').textContent =
-                        'Timeout - refresh halaman untuk melihat hasil';
-                }
-            }, 3000);
-        })
-        .catch(function(e){ log.textContent += '> Error: ' + e + '\n'; });
-}
-
-function pollStatus(target, log) {
-    fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/status")%>')
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-            var allDone = true;
-            ['pln','pdam','wifi'].forEach(function(svc){
-                if (target !== 'all' && target !== svc) return;
-                var s = d[svc].status;
-                setBadge(svc, s);
-                if (s === 'loading' || s === 'belum_dicek') {
-                    allDone = false;
-                } else if (s === 'ok') {
-                    updateAmount(svc, d[svc]);
-                }
+var poll;
+function log(t){var b=document.getElementById('log-box');b.style.display='block';b.textContent+=t+'\n';b.scrollTop=b.scrollHeight;}
+function badge(s,v){var e=document.getElementById('b-'+s);if(e){e.className='status-badge status-'+v;e.textContent=v;}}
+function doRefresh(t){
+  document.getElementById('last-check').textContent='⏳ Mengecek '+t+'...';
+  if(t==='all'||t==='pln')badge('pln','loading');
+  if(t==='all'||t==='pdam')badge('pdam','loading');
+  if(t==='all'||t==='wifi')badge('wifi','loading');
+  log('> Mulai cek '+t);
+  fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/refresh")%>?target='+t)
+    .then(function(r){return r.json();}).then(function(){
+      var n=0;
+      poll=setInterval(function(){
+        n++;if(n>20){clearInterval(poll);log('> Timeout');return;}
+        fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/status")%>')
+          .then(function(r){return r.json();}).then(function(d){
+            ['pln','pdam','wifi'].forEach(function(s){
+              if(t!=='all'&&t!==s)return;
+              badge(s,d[s].status);
             });
-            if (allDone) {
-                clearInterval(pollTimer);
-                var now = new Date();
-                document.getElementById('last-check').textContent =
-                    '✅ Diperbarui: ' + now.toLocaleTimeString('id-ID');
-                log.textContent += '> Selesai!\n';
-            } else {
-                log.textContent += '> Mengecek... ' + new Date().toLocaleTimeString('id-ID') + '\n';
-                log.scrollTop = log.scrollHeight;
-            }
-        });
-}
-
-function setBadge(svc, status) {
-    var el = document.getElementById('badge-' + svc);
-    if (!el) return;
-    el.className = 'status-badge status-' + status;
-    el.textContent = status;
-}
-
-function updateAmount(svc, info) {
-    var el = document.getElementById('amount-' + svc);
-    if (!el) return;
-    var n = parseInt(info.tagihan || 0);
-    el.textContent = 'Rp ' + n.toLocaleString('id-ID');
+            var done=true;
+            ['pln','pdam','wifi'].forEach(function(s){
+              if(t!=='all'&&t!==s)return;
+              if(d[s].status==='loading'||d[s].status==='belum_dicek')done=false;
+            });
+            if(done){clearInterval(poll);document.getElementById('last-check').textContent='✅ '+new Date().toLocaleTimeString('id-ID');log('> Selesai!');}
+            else log('> Proses... '+new Date().toLocaleTimeString('id-ID'));
+          });
+      },3000);
+    }).catch(function(e){log('> Error: '+e);});
 }
 </script>
 <%+footer%>

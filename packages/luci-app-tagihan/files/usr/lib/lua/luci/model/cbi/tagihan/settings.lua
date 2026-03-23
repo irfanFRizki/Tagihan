@@ -1,12 +1,8 @@
--- /usr/lib/lua/luci/model/cbi/tagihan/settings.lua
--- Halaman Pengaturan Tagihan Bot
-
 local m, s, o
 
 m = Map("tagihan", translate("Tagihan Bot"),
     translate("Pengaturan nomor pelanggan dan akun untuk cek tagihan bulanan."))
 
--- ── Pengaturan Umum ──────────────────────────────
 s = m:section(TypedSection, "settings", translate("Pengaturan Umum"))
 s.anonymous = true
 
@@ -22,7 +18,6 @@ o:value("12", "Setiap 12 Jam")
 o:value("24", "Setiap 24 Jam")
 o.default = "6"
 
--- ── PLN ──────────────────────────────────────────
 s = m:section(NamedSection, "pln", "tagihan", translate("PLN Pascabayar"))
 s.anonymous = false
 
@@ -32,10 +27,8 @@ o.rmempty = false
 
 o = s:option(Value, "idpel", translate("ID Pelanggan"))
 o.placeholder = "12 digit nomor ID pelanggan PLN"
-o.datatype = "string"
 o:depends("enabled", "1")
 
--- ── PDAM Jakarta (PAM Jaya) ───────────────────────
 s = m:section(NamedSection, "pdam", "tagihan", translate("PDAM Jakarta (PAM Jaya)"))
 s.anonymous = false
 
@@ -45,10 +38,8 @@ o.rmempty = false
 
 o = s:option(Value, "nomor_pelanggan", translate("Nomor Pelanggan"))
 o.placeholder = "Nomor pelanggan PDAM (PAM Jaya)"
-o.datatype = "string"
 o:depends("enabled", "1")
 
--- ── WiFi (MyRepublic) ─────────────────────────────
 s = m:section(NamedSection, "wifi", "tagihan", translate("WiFi MyRepublic"))
 s.anonymous = false
 
@@ -58,7 +49,6 @@ o.rmempty = false
 
 o = s:option(Value, "email", translate("Email MyRepublic"))
 o.placeholder = "email@contoh.com"
-o.datatype = "string"
 o:depends("enabled", "1")
 
 o = s:option(Value, "password", translate("Password"))
