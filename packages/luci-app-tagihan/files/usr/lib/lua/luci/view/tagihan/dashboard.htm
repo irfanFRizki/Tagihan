@@ -1,32 +1,39 @@
 <%+header%>
 <style>
-.tagihan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:16px 0}
+.tagihan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin:16px 0}
 .tagihan-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .tagihan-card.disabled{opacity:.55}
 .card-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;border-bottom:2px solid #f0f0f0;padding-bottom:10px}
-.card-icon{font-size:28px}
-.card-title{font-size:15px;font-weight:700;color:#333}
-.card-subtitle{font-size:12px;color:#888}
-.tagihan-amount{font-size:24px;font-weight:800;color:#e74c3c;margin:8px 0}
-.card-meta{font-size:12px;color:#666;margin:4px 0}
-.status-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:auto}
+.card-icon{font-size:26px}
+.card-title{font-size:14px;font-weight:700;color:#333}
+.card-subtitle{font-size:11px;color:#888}
+.tagihan-amount{font-size:22px;font-weight:800;color:#e74c3c;margin:6px 0}
+.tagihan-amount.lunas{color:#27ae60}
+.card-meta{font-size:12px;color:#555;margin:3px 0}
+.status-badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600;margin-left:auto;white-space:nowrap}
 .status-ok{background:#d4edda;color:#155724}
 .status-error{background:#f8d7da;color:#721c24}
 .status-disabled,.status-belum_dicek{background:#e2e3e5;color:#383d41}
 .status-loading{background:#fff3cd;color:#856404}
+.bayar-lunas{background:#d4edda;color:#155724;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.bayar-belum{background:#fff3cd;color:#856404;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
 .btn-refresh{margin-top:10px;padding:6px 14px;background:#3498db;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px}
+.btn-refresh:hover{background:#2980b9}
 .btn-all{margin-bottom:16px;padding:9px 22px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
 #last-check{font-size:12px;color:#888;margin-left:12px}
-#log-box{background:#1a1a2e;color:#0ff;font-family:monospace;font-size:12px;padding:10px;border-radius:6px;max-height:100px;overflow-y:auto;display:none;margin-top:10px;white-space:pre-wrap}
+#log-box{background:#1a1a2e;color:#0ff;font-family:monospace;font-size:11px;padding:10px;border-radius:6px;max-height:80px;overflow-y:auto;display:none;margin-top:10px;white-space:pre-wrap}
 </style>
 
-<h2><%:Tagihan Bot — Dashboard%></h2>
+<h2>📋 <%:Tagihan Bot — Dashboard%></h2>
 <button class="btn-all" onclick="doRefresh('all')">🔄 <%:Refresh Semua%></button>
+<a href="<%=luci.dispatcher.build_url("admin/services/tagihan/log")%>"
+   style="margin-left:8px;font-size:13px">📋 Lihat Log →</a>
 <span id="last-check"></span>
 <div id="log-box"></div>
 
 <div class="tagihan-grid">
 
+<%-- ═══ PLN ═══════════════════════════════════════════ --%>
 <div class="tagihan-card <%=(data.pln.enabled=="0") and "disabled" or ""%>">
   <div class="card-header">
     <span class="card-icon">⚡</span>
@@ -36,21 +43,29 @@
   <% if data.pln.enabled=="1" then %>
     <% if data.pln.status=="ok" then %>
       <div class="card-meta">👤 <%=data.pln.nama%></div>
+      <% if data.pln.daya~="" then %>
       <div class="card-meta">🔌 <%=data.pln.daya%> VA — <%=data.pln.tarif%></div>
-      <div class="tagihan-amount">Rp <%=tostring(data.pln.tagihan)%></div>
+      <% end %>
+      <div class="tagihan-amount <%=(tonumber(data.pln.tagihan) or 0)==0 and "lunas" or ""%>">
+        <%=(tonumber(data.pln.tagihan) or 0)==0 and "✅ Lunas" or "Rp "..tostring(data.pln.tagihan)%>
+      </div>
+      <% if data.pln.periode~="" then %>
       <div class="card-meta">📅 <%=data.pln.periode%></div>
+      <% end %>
     <% elseif data.pln.status=="error" then %>
-      <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
+      <div style="color:#e74c3c;font-size:12px">❌ Gagal ambil data</div>
+      <div style="color:#aaa;font-size:11px;margin-top:4px">API PLN tidak tersedia publik.<br>Aktifkan notif email di PLN Mobile.</div>
     <% else %>
       <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
-    <div class="card-meta" style="font-size:11px;margin-top:8px">ID: <%=data.pln.idpel%></div>
+    <div class="card-meta" style="font-size:11px;margin-top:6px;color:#aaa">ID: <%=data.pln.idpel%></div>
   <% else %>
     <div style="color:#aaa;font-size:13px">Belum dikonfigurasi — <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
   <% end %>
   <button class="btn-refresh" onclick="doRefresh('pln')">🔄 Refresh</button>
 </div>
 
+<%-- ═══ PDAM ════════════════════════════════════════════ --%>
 <div class="tagihan-card <%=(data.pdam.enabled=="0") and "disabled" or ""%>">
   <div class="card-header">
     <span class="card-icon">💧</span>
@@ -60,21 +75,33 @@
   <% if data.pdam.enabled=="1" then %>
     <% if data.pdam.status=="ok" then %>
       <div class="card-meta">👤 <%=data.pdam.nama%></div>
-      <div class="tagihan-amount">Rp <%=tostring(data.pdam.tagihan)%></div>
+      <div class="tagihan-amount <%=(tonumber(data.pdam.tagihan) or 0)==0 and "lunas" or ""%>">
+        <%=(tonumber(data.pdam.tagihan) or 0)==0 and "✅ Lunas" or "Rp "..tostring(data.pdam.tagihan)%>
+      </div>
+      <% if data.pdam.bayar_status and data.pdam.bayar_status~="" then %>
+      <div class="card-meta">
+        <span class="<%=string.find((data.pdam.bayar_status or ""):lower(),"lunas") and "bayar-lunas" or "bayar-belum"%>">
+          <%=data.pdam.bayar_status%>
+        </span>
+      </div>
+      <% end %>
       <div class="card-meta">📅 <%=data.pdam.periode%></div>
+      <% if data.pdam.pemakaian~="" and data.pdam.pemakaian~="-" then %>
       <div class="card-meta">🚿 <%=data.pdam.pemakaian%> m³</div>
+      <% end %>
     <% elseif data.pdam.status=="error" then %>
-      <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
+      <div style="color:#e74c3c;font-size:12px">❌ Gagal ambil data</div>
     <% else %>
       <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
-    <div class="card-meta" style="font-size:11px;margin-top:8px">No: <%=data.pdam.nomor_pelanggan%></div>
+    <div class="card-meta" style="font-size:11px;margin-top:6px;color:#aaa">No: <%=data.pdam.nomor_pelanggan%></div>
   <% else %>
     <div style="color:#aaa;font-size:13px">Belum dikonfigurasi — <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
   <% end %>
   <button class="btn-refresh" onclick="doRefresh('pdam')">🔄 Refresh</button>
 </div>
 
+<%-- ═══ WiFi ════════════════════════════════════════════ --%>
 <div class="tagihan-card <%=(data.wifi.enabled=="0") and "disabled" or ""%>">
   <div class="card-header">
     <span class="card-icon">📶</span>
@@ -84,10 +111,14 @@
   <% if data.wifi.enabled=="1" then %>
     <% if data.wifi.status=="ok" then %>
       <div class="card-meta">📦 <%=data.wifi.nama_paket%></div>
-      <div class="tagihan-amount">Rp <%=tostring(data.wifi.tagihan)%></div>
-      <div class="card-meta">📅 Jatuh tempo: <%=data.wifi.jatuh_tempo%></div>
+      <div class="tagihan-amount <%=(tonumber(data.wifi.tagihan) or 0)==0 and "lunas" or ""%>">
+        <%=(tonumber(data.wifi.tagihan) or 0)==0 and "✅ Lunas" or "Rp "..tostring(data.wifi.tagihan)%>
+      </div>
+      <% if data.wifi.jatuh_tempo~="" then %>
+      <div class="card-meta">⏰ Jatuh tempo: <%=data.wifi.jatuh_tempo%></div>
+      <% end %>
     <% elseif data.wifi.status=="error" then %>
-      <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
+      <div style="color:#e74c3c;font-size:12px">❌ Gagal ambil data</div>
     <% else %>
       <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
@@ -109,6 +140,7 @@ function doRefresh(t){
   if(t==='all'||t==='pdam')badge('pdam','loading');
   if(t==='all'||t==='wifi')badge('wifi','loading');
   log('> Mulai cek '+t);
+  clearInterval(poll);
   fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/refresh")%>?target='+t)
     .then(function(r){return r.json();}).then(function(){
       var n=0;
@@ -122,8 +154,13 @@ function doRefresh(t){
               badge(s,d[s].status);
               if(d[s].status==='loading'||d[s].status==='belum_dicek')done=false;
             });
-            if(done){clearInterval(poll);document.getElementById('last-check').textContent='✅ '+new Date().toLocaleTimeString('id-ID');log('> Selesai!');}
-            else log('> Proses... '+new Date().toLocaleTimeString('id-ID'));
+            if(done){
+              clearInterval(poll);
+              document.getElementById('last-check').textContent='✅ '+new Date().toLocaleTimeString('id-ID');
+              log('> Selesai! Refresh halaman untuk lihat data terbaru.');
+            } else {
+              log('> Proses... '+new Date().toLocaleTimeString('id-ID'));
+            }
           });
       },3000);
     }).catch(function(e){log('> Error: '+e);});

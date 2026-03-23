@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${1:-2.3.0}"
+VERSION="${1:-2.4.0}"
 ARCH="aarch64_cortex-a72"
 REPO_ROOT="$(pwd)"
 OUT="${REPO_ROOT}/dist"
