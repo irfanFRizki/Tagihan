@@ -1,6 +1,3 @@
-# /etc/config/tagihan
-# Konfigurasi Tagihan Bot - irfanFRizki
-
 config tagihan 'pln'
     option enabled '0'
     option idpel ''
@@ -35,4 +32,3 @@ config tagihan 'wifi'
 config tagihan 'settings'
     option auto_check '1'
     option interval '6'
-    option notify_on_new '1'

@@ -1,25 +1,16 @@
 #!/bin/sh /etc/rc.common
-# /etc/init.d/tagihan — Tagihan Bot init script
-
 START=99
 STOP=10
-USE_PROCD=0
-
 CRON_TAG="tagihan-cron"
 
 start() {
-    local enabled=$(uci -q get tagihan.settings.auto_check)
     local interval=$(uci -q get tagihan.settings.interval)
     [ -z "$interval" ] && interval=6
-
-    # Tambah cron job
     crontab -l 2>/dev/null | grep -v "$CRON_TAG" > /tmp/cron_tmp
     echo "0 */${interval} * * * /usr/bin/tagihan-check all # ${CRON_TAG}" >> /tmp/cron_tmp
     crontab /tmp/cron_tmp
     rm -f /tmp/cron_tmp
-
-    # Jalankan pertama kali
-    /usr/bin/tagihan-check all &
+    /usr/bin/tagihan-check all > /tmp/tagihan-last.log 2>&1 &
     echo "Tagihan Bot dimulai. Interval: setiap ${interval} jam."
 }
 
@@ -28,8 +19,4 @@ stop() {
     echo "Tagihan Bot dihentikan."
 }
 
-restart() {
-    stop
-    sleep 1
-    start
-}
+restart() { stop; sleep 1; start; }

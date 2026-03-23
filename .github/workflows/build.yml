@@ -5,9 +5,8 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-# ✅ FIX: deklarasi permissions eksplisit
 permissions:
-  contents: write   # wajib untuk push tag & create release
+  contents: write
   actions: read
 
 jobs:
@@ -33,6 +32,11 @@ jobs:
             echo ""
             echo "EOF_CHANGELOG_DELIMITER"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Verify source files
+        run: |
+          echo "=== Struktur packages/ ==="
+          find packages/ -type f | sort
 
       - name: Build IPK
         run: |

@@ -15,7 +15,6 @@
 .status-disabled,.status-belum_dicek{background:#e2e3e5;color:#383d41}
 .status-loading{background:#fff3cd;color:#856404}
 .btn-refresh{margin-top:10px;padding:6px 14px;background:#3498db;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px}
-.btn-refresh:hover{background:#2980b9}
 .btn-all{margin-bottom:16px;padding:9px 22px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
 #last-check{font-size:12px;color:#888;margin-left:12px}
 #log-box{background:#1a1a2e;color:#0ff;font-family:monospace;font-size:12px;padding:10px;border-radius:6px;max-height:100px;overflow-y:auto;display:none;margin-top:10px;white-space:pre-wrap}
@@ -28,7 +27,6 @@
 
 <div class="tagihan-grid">
 
-<%-- PLN --%>
 <div class="tagihan-card <%=(data.pln.enabled=="0") and "disabled" or ""%>">
   <div class="card-header">
     <span class="card-icon">⚡</span>
@@ -38,8 +36,8 @@
   <% if data.pln.enabled=="1" then %>
     <% if data.pln.status=="ok" then %>
       <div class="card-meta">👤 <%=data.pln.nama%></div>
-      <div class="card-meta">🔌 <%=data.pln.daya%> VA &mdash; <%=data.pln.tarif%></div>
-      <div class="tagihan-amount" id="a-pln">Rp <%=tostring(data.pln.tagihan)%></div>
+      <div class="card-meta">🔌 <%=data.pln.daya%> VA — <%=data.pln.tarif%></div>
+      <div class="tagihan-amount">Rp <%=tostring(data.pln.tagihan)%></div>
       <div class="card-meta">📅 <%=data.pln.periode%></div>
     <% elseif data.pln.status=="error" then %>
       <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
@@ -48,12 +46,11 @@
     <% end %>
     <div class="card-meta" style="font-size:11px;margin-top:8px">ID: <%=data.pln.idpel%></div>
   <% else %>
-    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi &mdash; <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
+    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi — <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
   <% end %>
   <button class="btn-refresh" onclick="doRefresh('pln')">🔄 Refresh</button>
 </div>
 
-<%-- PDAM --%>
 <div class="tagihan-card <%=(data.pdam.enabled=="0") and "disabled" or ""%>">
   <div class="card-header">
     <span class="card-icon">💧</span>
@@ -63,7 +60,7 @@
   <% if data.pdam.enabled=="1" then %>
     <% if data.pdam.status=="ok" then %>
       <div class="card-meta">👤 <%=data.pdam.nama%></div>
-      <div class="tagihan-amount" id="a-pdam">Rp <%=tostring(data.pdam.tagihan)%></div>
+      <div class="tagihan-amount">Rp <%=tostring(data.pdam.tagihan)%></div>
       <div class="card-meta">📅 <%=data.pdam.periode%></div>
       <div class="card-meta">🚿 <%=data.pdam.pemakaian%> m³</div>
     <% elseif data.pdam.status=="error" then %>
@@ -73,12 +70,11 @@
     <% end %>
     <div class="card-meta" style="font-size:11px;margin-top:8px">No: <%=data.pdam.nomor_pelanggan%></div>
   <% else %>
-    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi &mdash; <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
+    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi — <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
   <% end %>
   <button class="btn-refresh" onclick="doRefresh('pdam')">🔄 Refresh</button>
 </div>
 
-<%-- WiFi --%>
 <div class="tagihan-card <%=(data.wifi.enabled=="0") and "disabled" or ""%>">
   <div class="card-header">
     <span class="card-icon">📶</span>
@@ -88,7 +84,7 @@
   <% if data.wifi.enabled=="1" then %>
     <% if data.wifi.status=="ok" then %>
       <div class="card-meta">📦 <%=data.wifi.nama_paket%></div>
-      <div class="tagihan-amount" id="a-wifi">Rp <%=tostring(data.wifi.tagihan)%></div>
+      <div class="tagihan-amount">Rp <%=tostring(data.wifi.tagihan)%></div>
       <div class="card-meta">📅 Jatuh tempo: <%=data.wifi.jatuh_tempo%></div>
     <% elseif data.wifi.status=="error" then %>
       <div style="color:#e74c3c;font-size:13px">❌ Gagal ambil data</div>
@@ -96,7 +92,7 @@
       <div style="color:#888;font-size:13px">⏳ Belum dicek</div>
     <% end %>
   <% else %>
-    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi &mdash; <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
+    <div style="color:#aaa;font-size:13px">Belum dikonfigurasi — <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Pengaturan →</a></div>
   <% end %>
   <button class="btn-refresh" onclick="doRefresh('wifi')">🔄 Refresh</button>
 </div>
@@ -120,13 +116,10 @@ function doRefresh(t){
         n++;if(n>20){clearInterval(poll);log('> Timeout');return;}
         fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/status")%>')
           .then(function(r){return r.json();}).then(function(d){
-            ['pln','pdam','wifi'].forEach(function(s){
-              if(t!=='all'&&t!==s)return;
-              badge(s,d[s].status);
-            });
             var done=true;
             ['pln','pdam','wifi'].forEach(function(s){
               if(t!=='all'&&t!==s)return;
+              badge(s,d[s].status);
               if(d[s].status==='loading'||d[s].status==='belum_dicek')done=false;
             });
             if(done){clearInterval(poll);document.getElementById('last-check').textContent='✅ '+new Date().toLocaleTimeString('id-ID');log('> Selesai!');}
