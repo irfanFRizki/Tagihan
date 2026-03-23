@@ -1,0 +1,14 @@
+#!/bin/sh
+uci -q batch << EOB
+set tagihan.pln=tagihan
+set tagihan.pln.enabled=0
+set tagihan.pdam=tagihan
+set tagihan.pdam.enabled=0
+set tagihan.wifi=tagihan
+set tagihan.wifi.enabled=0
+set tagihan.settings=tagihan
+set tagihan.settings.auto_check=1
+set tagihan.settings.interval=6
+commit tagihan
+EOB
+exit 0

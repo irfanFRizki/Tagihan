@@ -1,0 +1,68 @@
+name: Build IPK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version & changelog
+        id: info
+        run: |
+          VERSION=$(grep 'VERSION="${1:-' scripts/build-ipk.sh | head -1 \
+                    | sed 's/.*:-//' | sed 's/}"//')
+          DATE=$(date '+%Y-%m-%d')
+          echo "VERSION=$VERSION"   >> "$GITHUB_OUTPUT"
+          echo "DATE=$DATE"         >> "$GITHUB_OUTPUT"
+          echo "TAG=v${VERSION}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          {
+            echo "CHANGELOG<<EOF_CHANGELOG_DELIMITER"
+            git log --pretty=format:"- %s" -5
+            echo ""
+            echo "EOF_CHANGELOG_DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build IPK
+        run: |
+          chmod +x scripts/build-ipk.sh
+          bash scripts/build-ipk.sh ${{ steps.info.outputs.VERSION }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipk-build-${{ github.run_number }}
+          path: dist/*.ipk
+          retention-days: 30
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.info.outputs.TAG }}
+          name: "luci-app-tagihan v${{ steps.info.outputs.VERSION }} (${{ steps.info.outputs.DATE }}) Latest"
+          files: dist/*.ipk
+          body: |
+            ## v${{ steps.info.outputs.VERSION }} — ${{ steps.info.outputs.DATE }}
+            ### Perubahan
+            ${{ steps.info.outputs.CHANGELOG }}
+            ### Info Build
+            - Commit: `${{ github.sha }}`
+            - Branch: `${{ github.ref_name }}`
+            - Build: `#${{ github.run_number }}`
+            ### Cara Install
+            ```sh
+            opkg update
+            opkg remove tagihan luci-app-tagihan 2>/dev/null
+            opkg install tagihan_*.ipk --nodeps
+            opkg install luci-app-tagihan_*.ipk --nodeps
+            /etc/init.d/tagihan enable
+            /etc/init.d/tagihan start
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

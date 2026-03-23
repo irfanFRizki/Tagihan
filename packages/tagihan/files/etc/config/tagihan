@@ -1,0 +1,38 @@
+# /etc/config/tagihan
+# Konfigurasi Tagihan Bot - irfanFRizki
+
+config tagihan 'pln'
+    option enabled '0'
+    option idpel ''
+    option nama ''
+    option tagihan '0'
+    option periode ''
+    option daya ''
+    option tarif ''
+    option status 'belum_dicek'
+    option last_update ''
+
+config tagihan 'pdam'
+    option enabled '0'
+    option nomor_pelanggan ''
+    option nama ''
+    option tagihan '0'
+    option periode ''
+    option pemakaian ''
+    option status 'belum_dicek'
+    option last_update ''
+
+config tagihan 'wifi'
+    option enabled '0'
+    option email ''
+    option password ''
+    option nama_paket ''
+    option tagihan '0'
+    option jatuh_tempo ''
+    option status 'belum_dicek'
+    option last_update ''
+
+config tagihan 'settings'
+    option auto_check '1'
+    option interval '6'
+    option notify_on_new '1'
