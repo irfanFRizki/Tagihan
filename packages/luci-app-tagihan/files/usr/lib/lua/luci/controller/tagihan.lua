@@ -11,33 +11,37 @@ function index()
     page.acl_depends = { "luci-app-tagihan" }
 
     entry({"admin", "services", "tagihan", "dashboard"},
-        call("action_dashboard"),
-        _("Dashboard"), 10).leaf = true
+        call("action_dashboard"), _("Dashboard"), 10).leaf = true
 
     entry({"admin", "services", "tagihan", "settings"},
-        cbi("tagihan/settings"),
-        _("Pengaturan"), 20).leaf = true
+        cbi("tagihan/settings"), _("Pengaturan"), 20).leaf = true
+
+    entry({"admin", "services", "tagihan", "log"},
+        call("action_log"), _("Log"), 30).leaf = true
 
     entry({"admin", "services", "tagihan", "refresh"},
         call("action_refresh")).leaf = true
 
     entry({"admin", "services", "tagihan", "status"},
         call("action_status")).leaf = true
+
+    entry({"admin", "services", "tagihan", "getlog"},
+        call("action_getlog")).leaf = true
 end
 
 function action_dashboard()
     local uci  = require "luci.model.uci".cursor()
     local data = { pln = {}, pdam = {}, wifi = {} }
 
-    data.pln.enabled     = uci:get("tagihan","pln","enabled")          or "0"
-    data.pln.nama        = uci:get("tagihan","pln","nama")             or ""
-    data.pln.tagihan     = uci:get("tagihan","pln","tagihan")          or "0"
-    data.pln.periode     = uci:get("tagihan","pln","periode")          or ""
-    data.pln.daya        = uci:get("tagihan","pln","daya")             or ""
-    data.pln.tarif       = uci:get("tagihan","pln","tarif")            or ""
-    data.pln.status      = uci:get("tagihan","pln","status")           or "belum_dicek"
-    data.pln.last_update = uci:get("tagihan","pln","last_update")      or ""
-    data.pln.idpel       = uci:get("tagihan","pln","idpel")            or ""
+    data.pln.enabled     = uci:get("tagihan","pln","enabled")     or "0"
+    data.pln.nama        = uci:get("tagihan","pln","nama")        or ""
+    data.pln.tagihan     = uci:get("tagihan","pln","tagihan")     or "0"
+    data.pln.periode     = uci:get("tagihan","pln","periode")     or ""
+    data.pln.daya        = uci:get("tagihan","pln","daya")        or ""
+    data.pln.tarif       = uci:get("tagihan","pln","tarif")       or ""
+    data.pln.status      = uci:get("tagihan","pln","status")      or "belum_dicek"
+    data.pln.last_update = uci:get("tagihan","pln","last_update") or ""
+    data.pln.idpel       = uci:get("tagihan","pln","idpel")       or ""
 
     data.pdam.enabled         = uci:get("tagihan","pdam","enabled")         or "0"
     data.pdam.nama            = uci:get("tagihan","pdam","nama")            or ""
@@ -58,6 +62,22 @@ function action_dashboard()
     luci.template.render("tagihan/dashboard", { data = data })
 end
 
+function action_log()
+    luci.template.render("tagihan/log", {})
+end
+
+function action_getlog()
+    local http = require "luci.http"
+    http.prepare_content("text/plain")
+    local f = io.open("/tmp/tagihan-last.log", "r")
+    if f then
+        http.write(f:read("*a"))
+        f:close()
+    else
+        http.write("(log kosong - belum ada pengecekan)")
+    end
+end
+
 function action_refresh()
     local http   = require "luci.http"
     local target = http.formvalue("target") or "all"
@@ -70,7 +90,8 @@ function action_status()
     local http = require "luci.http"
     local uci  = require "luci.model.uci".cursor()
     local json = require "luci.jsonc"
-    local result = {
+    http.prepare_content("application/json")
+    http.write(json.stringify({
         pln  = {
             status      = uci:get("tagihan","pln","status")      or "belum_dicek",
             nama        = uci:get("tagihan","pln","nama")        or "",
@@ -90,7 +111,5 @@ function action_status()
             tagihan     = uci:get("tagihan","wifi","tagihan")     or "0",
             last_update = uci:get("tagihan","wifi","last_update") or "",
         }
-    }
-    http.prepare_content("application/json")
-    http.write(json.stringify(result))
+    }))
 end

@@ -1,29 +1,50 @@
 #!/usr/bin/env python3
-import json, os, sys, time, subprocess, urllib.request, urllib.parse, urllib.error, ssl
+# tagihan-check v2 — PLN + PDAM Jakarta + MyRepublic + Telegram notify
 
+import json, os, sys, time, subprocess, urllib.request, urllib.parse, urllib.error, ssl, traceback
+
+LOG_FILE  = "/tmp/tagihan-last.log"
 CACHE_DIR = "/tmp/tagihan"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
-ssl_ctx.verify_mode = ssl.CERT_NONE
+ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+_log_lines = []
+
+def log(msg):
+    ts = time.strftime("%H:%M:%S")
+    line = f"[{ts}] {msg}"
+    print(line)
+    _log_lines.append(line)
+
+def save_log():
+    try:
+        with open(LOG_FILE, "w") as f:
+            f.write("\n".join(_log_lines) + "\n")
+    except Exception:
+        pass
 
 def uci_get(key, default=""):
     try:
-        r = subprocess.run(["uci", "-q", "get", key], capture_output=True, text=True, timeout=5)
+        r = subprocess.run(["uci", "-q", "get", key],
+                           capture_output=True, text=True, timeout=5)
         return r.stdout.strip() if r.returncode == 0 else default
     except Exception:
         return default
 
 def uci_set(key, value):
     try:
-        subprocess.run(["uci", "-q", "set", f"{key}={value}"], capture_output=True, timeout=5)
+        subprocess.run(["uci", "-q", "set", f"{key}={value}"],
+                       capture_output=True, timeout=5)
     except Exception:
         pass
 
-def uci_commit(config="tagihan"):
+def uci_commit():
     try:
-        subprocess.run(["uci", "-q", "commit", config], capture_output=True, timeout=5)
+        subprocess.run(["uci", "-q", "commit", "tagihan"],
+                       capture_output=True, timeout=5)
     except Exception:
         pass
 
@@ -34,167 +55,382 @@ def save_cache(name, data):
     except Exception:
         pass
 
-def http_get(url, headers=None):
-    h = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+def http_get(url, headers=None, timeout=20):
+    h = {"User-Agent": "Mozilla/5.0 (Linux; OpenWrt)", "Accept": "application/json, text/html"}
     if headers:
         h.update(headers)
     req = urllib.request.Request(url, headers=h)
-    with urllib.request.urlopen(req, timeout=20, context=ssl_ctx) as r:
-        return r.read().decode("utf-8", errors="ignore")
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx) as r:
+        raw = r.read().decode("utf-8", errors="ignore")
+        return raw
 
-def http_post(url, data, headers=None):
+def http_post(url, data, headers=None, timeout=20):
     h = {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json", "Accept": "application/json"}
     if headers:
         h.update(headers)
     body = json.dumps(data).encode() if isinstance(data, dict) else data
     req = urllib.request.Request(url, data=body, headers=h, method="POST")
-    with urllib.request.urlopen(req, timeout=20, context=ssl_ctx) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx) as r:
         return r.read().decode("utf-8", errors="ignore")
 
+def fmt_rp(n):
+    try:
+        return "Rp {:,}".format(int(float(str(n).replace(",","").replace(".","")))).replace(",",".")
+    except Exception:
+        return str(n)
+
+# ══════════════════════════════════════════════
+# TELEGRAM
+# ══════════════════════════════════════════════
+def tg_send(text):
+    enabled  = uci_get("tagihan.telegram.enabled", "0")
+    token    = uci_get("tagihan.telegram.bot_token", "")
+    chat_id  = uci_get("tagihan.telegram.chat_id", "")
+    if enabled != "1" or not token or not chat_id:
+        return
+    try:
+        url  = f"https://api.telegram.org/bot{token}/sendMessage"
+        data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        http_post(url, data, timeout=10)
+        log("[TG] Notifikasi terkirim")
+    except Exception as e:
+        log(f"[TG] Gagal kirim: {e}")
+
+# ══════════════════════════════════════════════
+# PLN
+# ══════════════════════════════════════════════
 def check_pln():
     if uci_get("tagihan.pln.enabled") != "1":
+        log("[PLN] Tidak diaktifkan, skip")
         return {"status": "disabled"}
-    idpel = uci_get("tagihan.pln.idpel")
-    if not idpel:
-        return {"status": "error", "message": "ID Pelanggan belum diisi"}
-    print(f"[PLN] Cek ID: {idpel}")
-    for url in [f"https://api.pln.co.id/token/v2/registrations/{idpel}",
-                f"https://api.pln.co.id/token/v1/registrations/{idpel}"]:
-        try:
-            raw = http_get(url, {"Authorization": "Basic cGxuOnBsbg=="})
-            d = json.loads(raw)
-            r = d.get("data", d.get("response", {}).get("results", d))
-            if isinstance(r, dict) and (r.get("nama") or r.get("responseCode") == "00"):
-                res = {"status": "ok", "nama": r.get("nama",""), "idpel": idpel,
-                       "tarif": r.get("tarif",""), "daya": r.get("daya",""),
-                       "tagihan": r.get("totalTagihan", r.get("jumlahTagihan", 0)),
-                       "periode": "", "last_update": int(time.time())}
-                det = r.get("detilTagihan", [])
-                if isinstance(det, list) and det:
-                    res["periode"] = det[0].get("periode", "")
-                    if not res["tagihan"]:
-                        res["tagihan"] = det[0].get("total", 0)
-                print(f"[PLN] OK - {res['nama']}")
-                return res
-        except Exception as e:
-            print(f"[PLN] {url}: {e}")
-    return {"status": "error", "message": "Gagal ambil data PLN", "last_update": int(time.time())}
 
+    idpel = uci_get("tagihan.pln.idpel", "").strip()
+    if not idpel:
+        log("[PLN] ID Pelanggan kosong!")
+        return {"status": "error", "message": "ID Pelanggan belum diisi"}
+
+    log(f"[PLN] Cek ID Pelanggan: {idpel}")
+
+    # Endpoint API PLN — urutan dari yang paling sering berhasil
+    endpoints = [
+        ("GET", f"https://api.pln.co.id/token/v2/registrations/{idpel}",
+         {"Authorization": "Basic cGxuOnBsbg=="}),
+        ("GET", f"https://api.pln.co.id/token/v1/registrations/{idpel}",
+         {"Authorization": "Basic cGxuOnBsbg=="}),
+        ("GET", f"https://layanan.pln.co.id/api/v1/pelanggan/{idpel}", {}),
+        ("POST", "https://api.pln.co.id/token/v2/registrations",
+         {}, {"noMeter": idpel}),
+    ]
+
+    for method, url, hdrs, *body in endpoints:
+        try:
+            log(f"[PLN] Mencoba: {url[:60]}...")
+            if method == "POST":
+                raw = http_post(url, body[0] if body else {}, headers=hdrs)
+            else:
+                raw = http_get(url, headers=hdrs)
+
+            log(f"[PLN] Response ({len(raw)} bytes): {raw[:200]}")
+            d = json.loads(raw)
+
+            # Cari data di berbagai format response
+            r = (d.get("data") or
+                 d.get("response", {}).get("results") or
+                 d.get("result") or
+                 d.get("pelanggan") or d)
+
+            if not isinstance(r, dict):
+                log(f"[PLN] Format tidak dikenal: {type(r)}")
+                continue
+
+            nama    = r.get("nama") or r.get("name") or r.get("namaPelanggan") or ""
+            tagihan = (r.get("totalTagihan") or r.get("jumlahTagihan") or
+                       r.get("total") or r.get("tagihan") or 0)
+            tarif   = r.get("tarif") or r.get("kodeTarif") or ""
+            daya    = r.get("daya") or r.get("kodeDaya") or ""
+            periode = ""
+
+            # Coba ambil dari detil
+            for key in ("detilTagihan", "infoTagihan", "detail", "tagihan"):
+                det = r.get(key)
+                if isinstance(det, list) and det:
+                    periode = det[0].get("periode") or det[0].get("bulan") or ""
+                    if not tagihan:
+                        tagihan = det[0].get("total") or det[0].get("nilaiTagihan") or 0
+                    break
+
+            if nama or tagihan:
+                log(f"[PLN] OK - Nama: {nama}, Tagihan: {fmt_rp(tagihan)}")
+                return {"status": "ok", "nama": nama, "idpel": idpel,
+                        "tarif": tarif, "daya": daya, "tagihan": tagihan,
+                        "periode": periode, "last_update": int(time.time())}
+            else:
+                log(f"[PLN] Data kosong dari endpoint ini, coba selanjutnya")
+
+        except urllib.error.HTTPError as e:
+            body_err = ""
+            try:
+                body_err = e.read().decode("utf-8", errors="ignore")[:200]
+            except Exception:
+                pass
+            log(f"[PLN] HTTP {e.code}: {body_err}")
+        except json.JSONDecodeError as e:
+            log(f"[PLN] Bukan JSON: {e}")
+        except Exception as e:
+            log(f"[PLN] Error: {e}")
+
+    log("[PLN] Semua endpoint gagal")
+    return {"status": "error", "message": "Semua endpoint PLN gagal. Cek log untuk detail.",
+            "last_update": int(time.time())}
+
+# ══════════════════════════════════════════════
+# PDAM JAKARTA (PAM JAYA)
+# ══════════════════════════════════════════════
 def check_pdam():
     if uci_get("tagihan.pdam.enabled") != "1":
+        log("[PDAM] Tidak diaktifkan, skip")
         return {"status": "disabled"}
-    nomor = uci_get("tagihan.pdam.nomor_pelanggan")
-    if not nomor:
-        return {"status": "error", "message": "Nomor pelanggan belum diisi"}
-    print(f"[PDAM] Cek nomor: {nomor}")
-    for url in ["https://pelanggan.pamjaya.co.id/api/tagihan",
-                "https://pelanggan.pamjaya.co.id/api/cek-tagihan"]:
-        try:
-            raw = http_post(url, {"nomorPelanggan": nomor, "noCustomer": nomor})
-            d = json.loads(raw)
-            r = d.get("data", d.get("result", d))
-            if isinstance(r, dict):
-                tagihan = r.get("totalTagihan", r.get("total", 0))
-                nama = r.get("nama", "")
-                if tagihan or nama:
-                    res = {"status": "ok", "nama": nama, "nomor": nomor,
-                           "tagihan": tagihan, "periode": r.get("periode",""),
-                           "pemakaian": r.get("pemakaian",""), "last_update": int(time.time())}
-                    print(f"[PDAM] OK - {nama}")
-                    return res
-        except Exception as e:
-            print(f"[PDAM] {url}: {e}")
-    return {"status": "error", "message": "Gagal ambil data PDAM", "last_update": int(time.time())}
 
+    nomor = uci_get("tagihan.pdam.nomor_pelanggan", "").strip()
+    if not nomor:
+        log("[PDAM] Nomor pelanggan kosong!")
+        return {"status": "error", "message": "Nomor pelanggan belum diisi"}
+
+    log(f"[PDAM] Cek nomor: {nomor}")
+
+    # Endpoint API PAM Jaya
+    endpoints = [
+        ("POST_JSON", "https://pelanggan.pamjaya.co.id/api/tagihan",
+         {"nomorPelanggan": nomor}),
+        ("POST_JSON", "https://pelanggan.pamjaya.co.id/api/cek-tagihan",
+         {"nomorPelanggan": nomor, "noCustomer": nomor}),
+        ("GET", f"https://pelanggan.pamjaya.co.id/api/tagihan/{nomor}", {}),
+        ("POST_FORM", "https://pelanggan.pamjaya.co.id/cek-tagihan",
+         {"nomor_pelanggan": nomor}),
+    ]
+
+    for method, url, payload in endpoints:
+        try:
+            log(f"[PDAM] Mencoba: {url[:60]}...")
+            if method == "POST_JSON":
+                raw = http_post(url, payload)
+            elif method == "POST_FORM":
+                form = urllib.parse.urlencode(payload).encode()
+                req  = urllib.request.Request(url, data=form, headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "application/json, text/html"
+                })
+                with urllib.request.urlopen(req, timeout=20, context=ssl_ctx) as resp:
+                    raw = resp.read().decode("utf-8", errors="ignore")
+            else:
+                raw = http_get(url)
+
+            log(f"[PDAM] Response ({len(raw)} bytes): {raw[:200]}")
+
+            d = json.loads(raw)
+            r = (d.get("data") or d.get("result") or
+                 d.get("tagihan") or d.get("pelanggan") or d)
+
+            if isinstance(r, dict):
+                tagihan  = (r.get("totalTagihan") or r.get("total") or
+                            r.get("tagihan") or r.get("nominalTagihan") or 0)
+                nama     = r.get("nama") or r.get("namaPelanggan") or r.get("name") or ""
+                periode  = r.get("periode") or r.get("bulan") or r.get("periodeTagihan") or ""
+                pemakaian = r.get("pemakaian") or r.get("volume") or r.get("kubik") or ""
+
+                if tagihan or nama:
+                    log(f"[PDAM] OK - Nama: {nama}, Tagihan: {fmt_rp(tagihan)}")
+                    return {"status": "ok", "nama": nama, "nomor": nomor,
+                            "tagihan": tagihan, "periode": periode,
+                            "pemakaian": pemakaian, "last_update": int(time.time())}
+                else:
+                    log(f"[PDAM] Data kosong, coba endpoint berikutnya")
+
+        except urllib.error.HTTPError as e:
+            body_err = ""
+            try:
+                body_err = e.read().decode("utf-8", errors="ignore")[:200]
+            except Exception:
+                pass
+            log(f"[PDAM] HTTP {e.code}: {body_err}")
+        except json.JSONDecodeError:
+            log(f"[PDAM] Response bukan JSON (mungkin HTML), skip")
+        except Exception as e:
+            log(f"[PDAM] Error: {e}")
+
+    log("[PDAM] Semua endpoint gagal")
+    return {"status": "error", "message": "Semua endpoint PDAM gagal. Cek log untuk detail.",
+            "last_update": int(time.time())}
+
+# ══════════════════════════════════════════════
+# WIFI MYREPUBLIC
+# ══════════════════════════════════════════════
 def check_wifi():
     if uci_get("tagihan.wifi.enabled") != "1":
+        log("[WiFi] Tidak diaktifkan, skip")
         return {"status": "disabled"}
-    email = uci_get("tagihan.wifi.email")
-    password = uci_get("tagihan.wifi.password")
+
+    email    = uci_get("tagihan.wifi.email", "").strip()
+    password = uci_get("tagihan.wifi.password", "").strip()
     if not email or not password:
+        log("[WiFi] Email/password kosong!")
         return {"status": "error", "message": "Email/password belum diisi"}
-    print(f"[WiFi] Login: {email}")
+
+    log(f"[WiFi] Login MyRepublic: {email}")
+
     import http.cookiejar, re
-    jar = http.cookiejar.CookieJar()
+    jar    = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(jar),
         urllib.request.HTTPSHandler(context=ssl_ctx))
-    for login_url in ["https://member.myrepublic.net.id/customer/login",
-                      "https://myrepublic.net.id/my-account"]:
-        try:
-            req = urllib.request.Request(login_url, headers={"User-Agent": "Mozilla/5.0"})
-            page = opener.open(req, timeout=15).read().decode("utf-8", errors="ignore")
-            nonce = ""
-            m = re.search(r'name="[_]nonce"\s+value="([^"]+)"', page)
-            if m:
-                nonce = m.group(1)
-            payload = {"log": email, "pwd": password, "username": email,
-                       "password": password, "login": "Login"}
-            if nonce:
-                payload["_wpnonce"] = nonce
-            form_data = urllib.parse.urlencode(payload).encode()
-            req2 = urllib.request.Request(login_url, data=form_data, headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": "Mozilla/5.0", "Referer": login_url})
-            resp2 = opener.open(req2, timeout=15)
-            content = resp2.read().decode("utf-8", errors="ignore")
-            if "logout" in content.lower() or "invoice" in content.lower():
-                for bill_url in ["https://myrepublic.net.id/my-account/orders/",
-                                  "https://myrepublic.net.id/my-account/"]:
-                    try:
-                        req3 = urllib.request.Request(bill_url, headers={"User-Agent": "Mozilla/5.0"})
-                        html = opener.open(req3, timeout=15).read().decode("utf-8", errors="ignore")
-                        tagihan = 0
-                        for pat in [r'(?:Rp|IDR)[.\s]*(\d[\d,.]+)', r'"amount"\s*:\s*"?(\d+)"?']:
-                            m2 = re.search(pat, html, re.IGNORECASE)
-                            if m2:
-                                raw_n = m2.group(1).replace(".", "").replace(",", "")
-                                if raw_n.isdigit() and int(raw_n) > 10000:
-                                    tagihan = int(raw_n)
-                                    break
-                        jatuh_tempo = ""
-                        m3 = re.search(r'(?:Due Date|Jatuh Tempo)[^:]*:\s*([0-9A-Za-z ,/-]+)', html, re.IGNORECASE)
-                        if m3:
-                            jatuh_tempo = m3.group(1).strip()[:30]
-                        if tagihan > 0:
-                            return {"status": "ok", "email": email, "nama_paket": "MyRepublic",
-                                    "tagihan": tagihan, "jatuh_tempo": jatuh_tempo,
-                                    "last_update": int(time.time())}
-                    except Exception as e:
-                        print(f"[WiFi] billing {bill_url}: {e}")
-        except Exception as e:
-            print(f"[WiFi] login {login_url}: {e}")
-    return {"status": "error", "message": "Gagal login MyRepublic", "last_update": int(time.time())}
 
-def save_to_uci(service, result):
+    login_url = "https://myrepublic.net.id/my-account"
+    try:
+        req  = urllib.request.Request(login_url, headers={"User-Agent": "Mozilla/5.0"})
+        page = opener.open(req, timeout=15).read().decode("utf-8", errors="ignore")
+
+        nonce = ""
+        m = re.search(r'"woocommerce-login-nonce"\s+value="([^"]+)"', page)
+        if m:
+            nonce = m.group(1)
+            log(f"[WiFi] Nonce ditemukan: {nonce[:10]}...")
+
+        payload = {"username": email, "password": password,
+                   "login": "Login", "redirect": "",
+                   "woocommerce-login-nonce": nonce,
+                   "_wp_http_referer": "/my-account"}
+        form_data = urllib.parse.urlencode(payload).encode()
+        req2 = urllib.request.Request(login_url, data=form_data, headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0", "Referer": login_url})
+        resp2   = opener.open(req2, timeout=15)
+        content = resp2.read().decode("utf-8", errors="ignore")
+        final_url = resp2.geturl()
+        log(f"[WiFi] Setelah login, URL: {final_url}")
+
+        if "logout" not in content.lower() and "my-account" not in final_url:
+            log("[WiFi] Login gagal - cek email/password")
+            return {"status": "error", "message": "Login gagal. Cek email/password MyRepublic.",
+                    "last_update": int(time.time())}
+
+        log("[WiFi] Login berhasil, ambil tagihan...")
+
+        for bill_url in ["https://myrepublic.net.id/my-account/orders/",
+                         "https://myrepublic.net.id/my-account/"]:
+            try:
+                req3  = urllib.request.Request(bill_url, headers={"User-Agent": "Mozilla/5.0"})
+                html  = opener.open(req3, timeout=15).read().decode("utf-8", errors="ignore")
+                log(f"[WiFi] Billing page {bill_url} ({len(html)} bytes)")
+
+                tagihan     = 0
+                jatuh_tempo = ""
+                nama_paket  = ""
+
+                for pat in [r'(?:Rp|IDR)\s*([0-9.,]+)', r'"total"\s*:\s*"([0-9.,]+)"',
+                            r'"amount"\s*:\s*([0-9]+)']:
+                    m = re.search(pat, html, re.IGNORECASE)
+                    if m:
+                        raw_n = m.group(1).replace(".", "").replace(",", "")
+                        if raw_n.isdigit() and int(raw_n) > 10000:
+                            tagihan = int(raw_n)
+                            break
+
+                m = re.search(r'(?:Due|Jatuh Tempo|Batas)[^:]*:\s*([0-9A-Za-z ,/-]{5,30})', html, re.IGNORECASE)
+                if m:
+                    jatuh_tempo = m.group(1).strip()
+
+                m = re.search(r'(?:Paket|Plan|Package)\s*[:\-]?\s*([A-Za-z0-9 ]+(?:Mbps|GB)?)', html, re.IGNORECASE)
+                if m:
+                    nama_paket = m.group(1).strip()[:40]
+
+                if tagihan > 0:
+                    log(f"[WiFi] OK - Paket: {nama_paket}, Tagihan: {fmt_rp(tagihan)}")
+                    return {"status": "ok", "email": email, "nama_paket": nama_paket,
+                            "tagihan": tagihan, "jatuh_tempo": jatuh_tempo,
+                            "last_update": int(time.time())}
+            except Exception as e:
+                log(f"[WiFi] Billing error: {e}")
+
+        log("[WiFi] Login OK tapi tagihan tidak ditemukan di halaman")
+        return {"status": "error", "message": "Login OK tapi tagihan tidak terbaca.",
+                "last_update": int(time.time())}
+
+    except Exception as e:
+        log(f"[WiFi] Exception: {e}\n{traceback.format_exc()}")
+        return {"status": "error", "message": f"Error: {e}", "last_update": int(time.time())}
+
+# ══════════════════════════════════════════════
+# SIMPAN UCI & KIRIM TELEGRAM
+# ══════════════════════════════════════════════
+def save_and_notify(service, result):
     status = result.get("status", "error")
     uci_set(f"tagihan.{service}.status", status)
     uci_set(f"tagihan.{service}.last_update", str(result.get("last_update", int(time.time()))))
+
     if service == "pln" and status == "ok":
-        uci_set("tagihan.pln.nama",    result.get("nama",""))
-        uci_set("tagihan.pln.tagihan", str(result.get("tagihan",0)))
-        uci_set("tagihan.pln.periode", result.get("periode",""))
-        uci_set("tagihan.pln.daya",    result.get("daya",""))
-        uci_set("tagihan.pln.tarif",   result.get("tarif",""))
+        uci_set("tagihan.pln.nama",    result.get("nama", ""))
+        uci_set("tagihan.pln.tagihan", str(result.get("tagihan", 0)))
+        uci_set("tagihan.pln.periode", result.get("periode", ""))
+        uci_set("tagihan.pln.daya",    result.get("daya", ""))
+        uci_set("tagihan.pln.tarif",   result.get("tarif", ""))
     elif service == "pdam" and status == "ok":
-        uci_set("tagihan.pdam.nama",      result.get("nama",""))
-        uci_set("tagihan.pdam.tagihan",   str(result.get("tagihan",0)))
-        uci_set("tagihan.pdam.periode",   result.get("periode",""))
-        uci_set("tagihan.pdam.pemakaian", str(result.get("pemakaian","")))
+        uci_set("tagihan.pdam.nama",      result.get("nama", ""))
+        uci_set("tagihan.pdam.tagihan",   str(result.get("tagihan", 0)))
+        uci_set("tagihan.pdam.periode",   result.get("periode", ""))
+        uci_set("tagihan.pdam.pemakaian", str(result.get("pemakaian", "")))
     elif service == "wifi" and status == "ok":
-        uci_set("tagihan.wifi.nama_paket",  result.get("nama_paket",""))
-        uci_set("tagihan.wifi.tagihan",     str(result.get("tagihan",0)))
-        uci_set("tagihan.wifi.jatuh_tempo", result.get("jatuh_tempo",""))
-    uci_commit("tagihan")
+        uci_set("tagihan.wifi.nama_paket",  result.get("nama_paket", ""))
+        uci_set("tagihan.wifi.tagihan",     str(result.get("tagihan", 0)))
+        uci_set("tagihan.wifi.jatuh_tempo", result.get("jatuh_tempo", ""))
+
+    uci_commit()
     save_cache(service, result)
 
+    # Kirim Telegram jika enabled
+    if uci_get("tagihan.telegram.notify_on_check", "1") == "1":
+        icon = {"pln": "⚡", "pdam": "💧", "wifi": "📶"}.get(service, "📋")
+        label = {"pln": "PLN", "pdam": "PDAM Jakarta", "wifi": "WiFi MyRepublic"}.get(service, service)
+        if status == "ok":
+            tagihan_val = result.get("tagihan", 0)
+            nama_val    = result.get("nama") or result.get("nama_paket") or result.get("email", "")
+            msg = (f"{icon} <b>{label}</b>\n"
+                   f"👤 {nama_val}\n"
+                   f"💰 <b>{fmt_rp(tagihan_val)}</b>")
+            if result.get("periode"):
+                msg += f"\n📅 {result['periode']}"
+            if result.get("jatuh_tempo"):
+                msg += f"\n⏰ Jatuh tempo: {result['jatuh_tempo']}"
+            tg_send(msg)
+        elif status == "error":
+            tg_send(f"{icon} <b>{label}</b> ❌ Gagal: {result.get('message','')}")
+
+# ══════════════════════════════════════════════
+# MAIN
+# ══════════════════════════════════════════════
 if __name__ == "__main__":
     target = sys.argv[1] if len(sys.argv) > 1 else "all"
-    print(f"=== Tagihan Check: {target} ===")
+    log(f"=== Tagihan Check: {target} ===")
+    log(f"=== Waktu: {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
+
+    results = {}
     if target in ("pln", "all"):
-        r = check_pln(); save_to_uci("pln", r); print(f"[PLN] {r['status']}")
+        r = check_pln()
+        save_and_notify("pln", r)
+        results["pln"] = r
+        log(f"[PLN] Hasil: {r['status']}")
+
     if target in ("pdam", "all"):
-        r = check_pdam(); save_to_uci("pdam", r); print(f"[PDAM] {r['status']}")
+        r = check_pdam()
+        save_and_notify("pdam", r)
+        results["pdam"] = r
+        log(f"[PDAM] Hasil: {r['status']}")
+
     if target in ("wifi", "all"):
-        r = check_wifi(); save_to_uci("wifi", r); print(f"[WiFi] {r['status']}")
-    print("=== Selesai ===")
+        r = check_wifi()
+        save_and_notify("wifi", r)
+        results["wifi"] = r
+        log(f"[WiFi] Hasil: {r['status']}")
+
+    log("=== Selesai ===")
+    save_log()

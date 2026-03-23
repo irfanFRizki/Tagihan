@@ -29,6 +29,12 @@ config tagihan 'wifi'
     option status 'belum_dicek'
     option last_update ''
 
+config tagihan 'telegram'
+    option enabled '0'
+    option bot_token ''
+    option chat_id ''
+    option notify_on_check '1'
+
 config tagihan 'settings'
     option auto_check '1'
     option interval '6'
