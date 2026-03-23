@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${1:-1.0.3}"
+VERSION="${1:-1.0.4}"
 ARCH="aarch64_cortex-a72"
 OUTPUT_DIR="$(pwd)/dist"
 WORK="/tmp/ipk-build-$$"
@@ -19,30 +19,48 @@ build_ipk() {
 
     local IPK_NAME="${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}.ipk"
     local W="${WORK}/${PKG_NAME}"
-    mkdir -p "$W"
+    mkdir -p "$W/data" "$W/ctrl"
 
     echo "  => Building ${IPK_NAME} ..."
+
+    # ── Pastikan source folder ada ───────────────────────
+    if [ ! -d "$FILES_SRC" ]; then
+        echo "  [ERROR] Folder tidak ada: $FILES_SRC"
+        exit 1
+    fi
+
+    # ── Hitung jumlah file di source ─────────────────────
+    FILE_COUNT=$(find "$FILES_SRC" -type f ! -path '*/.postinst/*' ! -name '.gitkeep' | wc -l)
+    echo "         Source: $FILES_SRC ($FILE_COUNT files)"
 
     # debian-binary
     printf '2.0\n' > "$W/debian-binary"
 
-    # data.tar.gz — file package (exclude folder .postinst)
-    mkdir -p "$W/data"
-    if [ -d "$FILES_SRC" ]; then
-        rsync -a --exclude='.postinst' "$FILES_SRC/" "$W/data/" 2>/dev/null \
-            || { cp -r "$FILES_SRC/." "$W/data/"; rm -rf "$W/data/.postinst"; }
-    fi
+    # ── data.tar.gz ───────────────────────────────────────
+    # Copy semua file KECUALI folder .postinst
+    find "$FILES_SRC" -mindepth 1 -maxdepth 1 ! -name '.postinst' | while read item; do
+        cp -r "$item" "$W/data/"
+    done
+
+    # Set permission
     if [ -d "$W/data/usr/bin" ]; then
         find "$W/data/usr/bin" -type f -exec chmod 755 {} \;
     fi
     if [ -d "$W/data/etc/init.d" ]; then
         find "$W/data/etc/init.d" -type f -exec chmod 755 {} \;
     fi
+    if [ -d "$W/data/etc/uci-defaults" ]; then
+        find "$W/data/etc/uci-defaults" -type f -exec chmod 755 {} \;
+    fi
+
+    # Cek isi data sebelum di-tar
+    DATA_FILES=$(find "$W/data" -type f | wc -l)
+    echo "         data/ berisi $DATA_FILES file"
+
     (cd "$W/data" && tar -czf "$W/data.tar.gz" \
         --numeric-owner --owner=0 --group=0 .)
 
-    # control.tar.gz
-    mkdir -p "$W/ctrl"
+    # ── control.tar.gz ────────────────────────────────────
     cat > "$W/ctrl/control" << CTRL
 Package: ${PKG_NAME}
 Version: ${PKG_VERSION}
@@ -53,9 +71,10 @@ Description: ${PKG_DESC}
 CTRL
 
     # Ambil postinst dari .postinst/postinst jika ada
-    local POSTINST_SRC="${FILES_SRC}/.postinst/postinst"
-    if [ -f "$POSTINST_SRC" ]; then
-        cp "$POSTINST_SRC" "$W/ctrl/postinst"
+    if [ -f "${FILES_SRC}/.postinst/postinst" ]; then
+        cp "${FILES_SRC}/.postinst/postinst" "$W/ctrl/postinst"
+        chmod 755 "$W/ctrl/postinst"
+        echo "         postinst: custom"
     else
         cat > "$W/ctrl/postinst" << 'POSTINST'
 #!/bin/sh
@@ -65,19 +84,22 @@ CTRL
 default_postinst $0 $@
 exit 0
 POSTINST
+        chmod 755 "$W/ctrl/postinst"
+        echo "         postinst: default"
     fi
-    chmod 755 "$W/ctrl/postinst"
 
     (cd "$W/ctrl" && tar -czf "$W/control.tar.gz" \
         --numeric-owner --owner=0 --group=0 .)
 
-    # outer tar — urutan WAJIB: debian-binary → data → control
+    # ── outer tar — URUTAN: debian-binary → data → control ─
     cd "$W"
     tar -czf "${OUTPUT_DIR}/${IPK_NAME}" \
         --numeric-owner --owner=0 --group=0 \
         debian-binary data.tar.gz control.tar.gz
 
-    echo "  [OK] dist/${IPK_NAME}"
+    # Verifikasi hasil
+    IPK_SIZE=$(du -sh "${OUTPUT_DIR}/${IPK_NAME}" | cut -f1)
+    echo "  [OK] dist/${IPK_NAME} ($IPK_SIZE)"
 }
 
 echo ""
@@ -102,3 +124,19 @@ rm -rf "$WORK"
 echo ""
 echo "=== Build selesai! ==="
 ls -lh "$OUTPUT_DIR"/*.ipk
+
+# ── Verifikasi isi IPK ──────────────────────────────────
+echo ""
+echo "=== Verifikasi isi data.tar.gz ==="
+for ipk in "$OUTPUT_DIR"/*.ipk; do
+    echo ""
+    echo "[ $(basename $ipk) ]"
+    TMPV="/tmp/verify-$$"
+    mkdir -p "$TMPV"
+    cd "$TMPV"
+    tar -xzf "$ipk" 2>/dev/null
+    echo "  File count: $(tar -tzf data.tar.gz 2>/dev/null | grep -v '/$' | wc -l) files"
+    tar -tzf data.tar.gz 2>/dev/null | grep -v '/$' | head -20 | sed 's/^/  /'
+    rm -rf "$TMPV"
+    cd - > /dev/null
+done
