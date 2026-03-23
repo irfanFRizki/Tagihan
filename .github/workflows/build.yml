@@ -5,6 +5,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# ✅ FIX: deklarasi permissions eksplisit
+permissions:
+  contents: write   # wajib untuk push tag & create release
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

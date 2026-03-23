@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${1:-1.0.1}"
+VERSION="${1:-1.0.2}"
 ARCH="aarch64_cortex-a72"
 # ✅ FIX: gunakan absolute path agar tidak rusak saat cd
 OUTPUT_DIR="$(pwd)/dist"
