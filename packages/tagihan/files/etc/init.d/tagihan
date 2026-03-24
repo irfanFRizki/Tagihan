@@ -1,21 +1,50 @@
 #!/bin/sh /etc/rc.common
+# /etc/init.d/tagihan - Tagihan Bot service
 START=99
 STOP=10
-CRON_TAG="tagihan-cron"
+CRON_TAG_CHECK="tagihan-autocheck"
+CRON_TAG_SCHED="tagihan-schedule"
 
 start() {
-    local interval=$(uci -q get tagihan.settings.interval)
+    local interval=$(uci -q get tagihan.settings.interval 2>/dev/null)
     [ -z "$interval" ] && interval=6
-    crontab -l 2>/dev/null | grep -v "$CRON_TAG" > /tmp/cron_tmp
-    echo "0 */${interval} * * * /usr/bin/tagihan-check all # ${CRON_TAG}" >> /tmp/cron_tmp
-    crontab /tmp/cron_tmp
-    rm -f /tmp/cron_tmp
-    /usr/bin/tagihan-check all > /tmp/tagihan-last.log 2>&1 &
-    echo "Tagihan Bot dimulai. Interval: setiap ${interval} jam."
+
+    # Cron auto-check
+    local auto=$(uci -q get tagihan.settings.auto_check 2>/dev/null)
+    crontab -l 2>/dev/null | grep -v "$CRON_TAG_CHECK" | grep -v "$CRON_TAG_SCHED" > /tmp/_cron_tagihan
+    if [ "$auto" = "1" ]; then
+        echo "0 */${interval} * * * /usr/bin/tagihan-check all >> /tmp/tagihan-last.log 2>&1 # ${CRON_TAG_CHECK}" >> /tmp/_cron_tagihan
+    fi
+
+    # Cron jadwal Telegram
+    local sched=$(uci -q get tagihan.telegram.schedule_enabled 2>/dev/null)
+    if [ "$sched" = "1" ]; then
+        local stype=$(uci -q get tagihan.telegram.schedule_type 2>/dev/null)
+        local shour=$(uci -q get tagihan.telegram.schedule_hour 2>/dev/null)
+        local smin=$(uci -q get tagihan.telegram.schedule_minute 2>/dev/null)
+        local sday=$(uci -q get tagihan.telegram.schedule_day 2>/dev/null)
+        [ -z "$shour" ] && shour=8
+        [ -z "$smin" ]  && smin=0
+        [ -z "$sday" ]  && sday=1
+        if [ "$stype" = "weekly" ]; then
+            # Setiap minggu hari X jam Y
+            echo "${smin} ${shour} * * ${sday} /usr/bin/tagihan-notify # ${CRON_TAG_SCHED}" >> /tmp/_cron_tagihan
+        else
+            # Setiap hari jam Y
+            echo "${smin} ${shour} * * * /usr/bin/tagihan-notify # ${CRON_TAG_SCHED}" >> /tmp/_cron_tagihan
+        fi
+    fi
+
+    crontab /tmp/_cron_tagihan
+    rm -f /tmp/_cron_tagihan
+
+    # Jalankan pertama kali
+    /usr/bin/tagihan-check all >> /tmp/tagihan-last.log 2>&1 &
+    echo "Tagihan Bot dimulai."
 }
 
 stop() {
-    crontab -l 2>/dev/null | grep -v "$CRON_TAG" | crontab -
+    crontab -l 2>/dev/null | grep -v "$CRON_TAG_CHECK" | grep -v "$CRON_TAG_SCHED" | crontab -
     echo "Tagihan Bot dihentikan."
 }
 

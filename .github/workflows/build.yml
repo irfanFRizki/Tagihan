@@ -2,7 +2,7 @@ name: Build IPK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -12,15 +12,17 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get version & changelog
+      - name: Get Version & Changelog
         id: info
         run: |
-          VERSION=$(grep 'VERSION="${1:-' scripts/build-ipk.sh | head -1 \
+          VERSION=$(grep 'VERSION=' scripts/build-ipk.sh | head -1 \
                     | sed 's/.*:-//' | sed 's/}"//')
           DATE=$(date '+%Y-%m-%d')
           echo "VERSION=$VERSION"   >> "$GITHUB_OUTPUT"
@@ -33,10 +35,11 @@ jobs:
             echo "EOF_CHANGELOG_DELIMITER"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Verify source files
+      - name: Show Source Tree
         run: |
           echo "=== Struktur packages/ ==="
           find packages/ -type f | sort
+          echo ""
 
       - name: Build IPK
         run: |
@@ -46,7 +49,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ipk-build-${{ github.run_number }}
+          name: ipk-v${{ steps.info.outputs.VERSION }}-build${{ github.run_number }}
           path: dist/*.ipk
           retention-days: 30
 
@@ -54,16 +57,21 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.info.outputs.TAG }}
-          name: "luci-app-tagihan v${{ steps.info.outputs.VERSION }} (${{ steps.info.outputs.DATE }}) Latest"
+          name: "luci-app-tagihan v${{ steps.info.outputs.VERSION }} (${{ steps.info.outputs.DATE }})"
           files: dist/*.ipk
           body: |
-            ## v${{ steps.info.outputs.VERSION }} — ${{ steps.info.outputs.DATE }}
+            ## Tagihan Bot v${{ steps.info.outputs.VERSION }}
+            **Build:** ${{ steps.info.outputs.DATE }} | #${{ github.run_number }}
+
+            ### Fitur
+            - Cek tagihan PDAM Jakarta (PAM Jaya) otomatis
+            - Cek tagihan WiFi MyRepublic via email IMAP
+            - Notifikasi Telegram terjadwal
+            - Dashboard LuCI informatif
+
             ### Perubahan
             ${{ steps.info.outputs.CHANGELOG }}
-            ### Info Build
-            - Commit: `${{ github.sha }}`
-            - Branch: `${{ github.ref_name }}`
-            - Build: `#${{ github.run_number }}`
+
             ### Cara Install
             ```sh
             opkg update
@@ -73,5 +81,10 @@ jobs:
             /etc/init.d/tagihan enable
             /etc/init.d/tagihan start
             ```
+            Buka LuCI → **Services → Tagihan Bot**
+
+            ### Info Build
+            - Commit: `${{ github.sha }}`
+            - Branch: `${{ github.ref_name }}`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+# tagihan-notify — Kirim ringkasan tagihan ke Telegram (dipanggil cron terjadwal)
+import subprocess, json, os, time
+import urllib.request, ssl
+
+ssl_ctx = ssl.create_default_context()
+ssl_ctx.check_hostname = False
+ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+def uci_get(key, default=""):
+    try:
+        r = subprocess.run(["uci","-q","get",key],
+                           capture_output=True,text=True,timeout=5)
+        return r.stdout.strip() if r.returncode==0 else default
+    except Exception:
+        return default
+
+def fmt_rp(n):
+    try:
+        return "Rp {:,}".format(int(float(
+            str(n).replace(",","").replace(".","")))).replace(",",".")
+    except Exception:
+        return str(n)
+
+def send(token, chat_id, text):
+    url  = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = json.dumps({"chat_id":chat_id,"text":text,"parse_mode":"HTML"}).encode()
+    req  = urllib.request.Request(url, data=data,
+           headers={"Content-Type":"application/json"}, method="POST")
+    urllib.request.urlopen(req, timeout=15, context=ssl_ctx)
+
+if __name__ == "__main__":
+    token   = uci_get("tagihan.telegram.bot_token","")
+    chat_id = uci_get("tagihan.telegram.chat_id","")
+    if not token or not chat_id:
+        exit(0)
+
+    # Cek dulu sebelum kirim
+    os.system("/usr/bin/tagihan-check all >> /tmp/tagihan-last.log 2>&1")
+    time.sleep(3)
+
+    now = time.strftime("%d %B %Y, %H:%M")
+    lines = [f"<b>Ringkasan Tagihan</b>"]
+    lines.append(f"<i>{now}</i>")
+    lines.append("")
+
+    # PDAM
+    if uci_get("tagihan.pdam.enabled") == "1":
+        pdam_status = uci_get("tagihan.pdam.status","")
+        if pdam_status == "ok":
+            nama     = uci_get("tagihan.pdam.nama","")
+            tagihan  = uci_get("tagihan.pdam.tagihan","0")
+            periode  = uci_get("tagihan.pdam.periode","")
+            bayar_st = uci_get("tagihan.pdam.bayar_status","")
+            lunas    = "lunas" in bayar_st.lower()
+            lines.append("💧 <b>PDAM Jakarta</b>")
+            lines.append(f"   👤 {nama}")
+            lines.append(f"   📅 {periode}")
+            if lunas:
+                lines.append("   ✅ <b>Tagihan Lunas</b>")
+            else:
+                lines.append(f"   💰 <b>{fmt_rp(tagihan)}</b>")
+                lines.append(f"   ❗ {bayar_st}")
+            lines.append("")
+
+    # WiFi
+    if uci_get("tagihan.wifi.enabled") == "1":
+        wifi_status = uci_get("tagihan.wifi.status","")
+        if wifi_status == "ok":
+            nama      = uci_get("tagihan.wifi.nama","")
+            tg_str    = uci_get("tagihan.wifi.tagihan_str","")
+            invoice   = uci_get("tagihan.wifi.invoice","")
+            jt        = uci_get("tagihan.wifi.jatuh_tempo","")
+            sbayar    = uci_get("tagihan.wifi.status_bayar","")
+            sudah     = sbayar == "SUDAH DIBAYAR"
+            lines.append("📶 <b>WiFi MyRepublic</b>")
+            lines.append(f"   👤 {nama}")
+            if invoice: lines.append(f"   📄 Invoice: {invoice}")
+            if jt:      lines.append(f"   ⏰ Jatuh Tempo: {jt}")
+            if sudah:
+                lines.append("   ✅ <b>Sudah Dibayar</b>")
+            else:
+                lines.append(f"   💰 <b>{tg_str}</b>")
+                lines.append(f"   ❗ Belum Dibayar")
+            lines.append("")
+
+    lines.append("─────────────────")
+    lines.append("🤖 <i>Tagihan Bot - irfanFRizki</i>")
+
+    try:
+        send(token, chat_id, "\n".join(lines))
+        print("Notifikasi terkirim")
+    except Exception as e:
+        print(f"Gagal kirim: {e}")

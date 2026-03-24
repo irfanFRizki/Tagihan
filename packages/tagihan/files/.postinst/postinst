@@ -1,18 +1,20 @@
 #!/bin/sh
-uci -q batch << EOB
+[ "${IPKG_NO_SCRIPT}" = "1" ] && exit 0
+[ -s ${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
+. ${IPKG_INSTROOT}/lib/functions.sh
+default_postinst $0 $@
+if [ ! -f /etc/config/tagihan ]; then
+    uci -q batch << EOB
 set tagihan.pdam=tagihan
 set tagihan.pdam.enabled=0
 set tagihan.wifi=tagihan
 set tagihan.wifi.enabled=0
 set tagihan.telegram=tagihan
 set tagihan.telegram.enabled=0
-set tagihan.telegram.schedule_enabled=0
-set tagihan.telegram.schedule_type=daily
-set tagihan.telegram.schedule_hour=8
-set tagihan.telegram.schedule_minute=0
 set tagihan.settings=tagihan
 set tagihan.settings.auto_check=1
 set tagihan.settings.interval=6
 commit tagihan
 EOB
+fi
 exit 0
