@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${1:-3.0.0}"
+VERSION="${1:-3.0.1}"
 ARCH="aarch64_cortex-a72"
 ROOT="$(pwd)"
 OUT="${ROOT}/dist"
@@ -120,5 +120,5 @@ for ipk in "$OUT"/*.ipk; do
     tar -xzf "$ipk" 2>/dev/null
     echo "  Files: $(tar -tzf data.tar.gz 2>/dev/null | grep -v '/$' | wc -l)"
     tar -tzf data.tar.gz 2>/dev/null | grep -v '/$' | sed 's/^/  /'
-    rm -rf "$T"; cd - > /dev/null
+    rm -rf "$T"; cd "$ROOT"
 done
