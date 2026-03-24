@@ -1,0 +1,64 @@
+<%+header%>
+<style>
+.log-wrap{max-width:900px;margin:0 auto}
+.log-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.btn{padding:7px 16px;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600}
+.btn-blue{background:#3b82f6;color:#fff}.btn-blue:hover{background:#2563eb}
+.btn-green{background:#10b981;color:#fff}.btn-green:hover{background:#059669}
+.btn-gray{background:#e5e7eb;color:#374151}.btn-gray:hover{background:#d1d5db}
+#logbox{background:#0d1117;color:#e6edf3;font-family:'Courier New',monospace;font-size:12px;
+  padding:16px;border-radius:10px;min-height:350px;max-height:520px;overflow-y:auto;
+  white-space:pre-wrap;word-break:break-all;border:1px solid #30363d;line-height:1.6}
+.c-ok{color:#3fb950}.c-err{color:#f85149}.c-warn{color:#d29922}
+.c-svc{color:#79c0ff;font-weight:700}.c-time{color:#8b949e}
+#status{font-size:12px;color:#6b7280;margin-left:4px}
+</style>
+
+<div class="log-wrap">
+<h2 style="margin-bottom:16px">Log Pengecekan Tagihan</h2>
+<div class="log-toolbar">
+  <button class="btn btn-green" onclick="runCheck('all')">Cek Semua</button>
+  <button class="btn btn-blue"  onclick="runCheck('pdam')">Cek PDAM</button>
+  <button class="btn btn-blue"  onclick="runCheck('wifi')">Cek WiFi</button>
+  <button class="btn btn-gray"  onclick="loadLog()">Refresh Log</button>
+  <button class="btn btn-gray"  onclick="document.getElementById('logbox').textContent='(dikosongkan)'">Clear</button>
+  <span id="status"></span>
+</div>
+<div id="logbox">(klik Cek Semua atau Refresh Log)</div>
+</div>
+
+<script>
+var pollT;
+function ss(t){document.getElementById('status').textContent=t;}
+function col(txt){
+  return txt
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/(\[\d{2}:\d{2}:\d{2}\])/g,'<span class="c-time">$1</span>')
+    .replace(/(\[PDAM\]|\[WiFi\]|\[TG\])/g,'<span class="c-svc">$1</span>')
+    .replace(/(OK|berhasil|Lunas|Terkirim)/gi,'<span class="c-ok">$1</span>')
+    .replace(/(ERROR|GAGAL|Error|gagal|Exception)/gi,'<span class="c-err">$1</span>')
+    .replace(/(WARN|warning)/gi,'<span class="c-warn">$1</span>');
+}
+function loadLog(){
+  ss('Memuat...');
+  fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/getlog")%>')
+    .then(function(r){return r.text();})
+    .then(function(t){
+      var b=document.getElementById('logbox');
+      b.innerHTML=col(t);
+      b.scrollTop=b.scrollHeight;
+      ss('Diperbarui '+new Date().toLocaleTimeString('id-ID'));
+    }).catch(function(e){ss('Error: '+e);});
+}
+function runCheck(t){
+  ss('Menjalankan '+t+'...');
+  clearInterval(pollT);
+  fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/refresh")%>?target='+t)
+    .then(function(r){return r.json();}).then(function(){
+      var n=0;
+      pollT=setInterval(function(){n++;loadLog();if(n>=15){clearInterval(pollT);ss('Selesai');}},3000);
+    });
+}
+loadLog();
+</script>
+<%+footer%>
