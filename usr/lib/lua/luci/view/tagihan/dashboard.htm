@@ -3,165 +3,208 @@
 *{box-sizing:border-box}
 .tb-wrap{max-width:900px;margin:0 auto;padding:0 8px}
 .tb-header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
-  border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff;display:flex;
-  align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.tb-title{font-size:20px;font-weight:800;letter-spacing:.5px}
+  border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.tb-title{font-size:20px;font-weight:800}
 .tb-subtitle{font-size:12px;color:#94a3b8;margin-top:2px}
 .tb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
-.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
 .btn-success{background:#10b981;color:#fff}.btn-success:hover{background:#059669}
-.btn-log{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25)}
-.btn-log:hover{background:rgba(255,255,255,.25)}
+.btn-ghost{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.btn-ghost:hover{background:rgba(255,255,255,.25)}
 .tb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}
 .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;border:1px solid #e5e7eb}
+.card-top-bar{height:4px}
+.bar-pdam{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.bar-wifi{background:linear-gradient(90deg,#10b981,#34d399)}
 .card-head{padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f3f4f6}
-.card-icon-wrap{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
 .icon-pdam{background:#dbeafe}
 .icon-wifi{background:#d1fae5}
-.card-head-info{flex:1}
+.card-info{flex:1}
 .card-name{font-size:15px;font-weight:700;color:#1f2937}
 .card-desc{font-size:11px;color:#9ca3af;margin-top:1px}
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
 .badge-ok{background:#d1fae5;color:#065f46}
 .badge-error{background:#fee2e2;color:#991b1b}
 .badge-loading{background:#fef3c7;color:#92400e}
 .badge-belum_dicek,.badge-disabled{background:#f3f4f6;color:#6b7280}
 .card-body{padding:16px 20px}
-.info-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f9fafb;font-size:13px}
+.amount-box{text-align:center;padding:14px 0 10px}
+.amount-lunas{font-size:26px;font-weight:900;color:#10b981}
+.amount-bayar{font-size:26px;font-weight:900;color:#ef4444}
+.amount-label{font-size:11px;color:#9ca3af;margin-top:2px}
+.tunggakan-box{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 14px;margin:10px 0}
+.tunggakan-title{font-size:12px;font-weight:700;color:#ea580c;margin-bottom:6px}
+.tunggakan-total{font-size:20px;font-weight:900;color:#dc2626;margin-top:4px}
+.divider{height:1px;background:#f3f4f6;margin:8px 0}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px solid #f9fafb}
 .info-row:last-child{border-bottom:none}
-.info-label{color:#6b7280;font-weight:500;display:flex;align-items:center;gap:5px}
-.info-value{color:#1f2937;font-weight:600;text-align:right}
-.amount-big{font-size:28px;font-weight:900;text-align:center;padding:12px 0}
-.amount-lunas{color:#10b981}
-.amount-bayar{color:#ef4444}
-.pill-lunas{background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700}
-.pill-belum{background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700}
-.card-foot{padding:12px 20px;background:#f9fafb;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}
+.info-lbl{color:#6b7280;font-weight:500}
+.info-val{color:#1f2937;font-weight:600;text-align:right}
+.pill-lunas{background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.pill-belum{background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.pill-warn{background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.card-foot{padding:11px 20px;background:#f9fafb;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}
 .foot-time{font-size:11px;color:#9ca3af}
-.btn-sm{padding:6px 14px;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600}
-.btn-sm-blue{background:#3b82f6;color:#fff}.btn-sm-blue:hover{background:#2563eb}
-.not-configured{padding:24px;text-align:center;color:#9ca3af;font-size:13px}
-.not-configured a{color:#3b82f6;text-decoration:none;font-weight:600}
-.status-bar{height:3px;background:linear-gradient(90deg,#3b82f6,#10b981)}
+.btn-sm{padding:6px 14px;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;background:#3b82f6;color:#fff}
+.btn-sm:hover{background:#2563eb}
+.empty-state{padding:28px;text-align:center;color:#9ca3af;font-size:13px}
+.empty-state a{color:#3b82f6;text-decoration:none;font-weight:600}
+#refresh-bar{display:none;text-align:center;padding:9px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:14px;font-size:13px;color:#92400e}
 </style>
-
+ 
 <div class="tb-wrap">
-
+ 
 <div class="tb-header">
   <div>
-    <div class="tb-title">Tagihan Bot</div>
-    <div class="tb-subtitle">irfanFRizki — Monitor Tagihan Bulanan</div>
+    <div class="tb-title">&#x1F4CB; Tagihan Bot</div>
+    <div class="tb-subtitle">irfanFRizki &mdash; Monitor Tagihan Bulanan Otomatis</div>
   </div>
   <div class="tb-actions">
     <button class="btn btn-success" onclick="doRefresh('all')">
       &#x1F504; Refresh Semua
     </button>
-    <a class="btn btn-log"
+    <a class="btn btn-ghost"
        href="<%=luci.dispatcher.build_url("admin/services/tagihan/log")%>">
       &#x1F4CB; Log
     </a>
-    <a class="btn btn-log"
+    <a class="btn btn-ghost"
        href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">
       &#x2699; Pengaturan
     </a>
   </div>
 </div>
-
-<div id="refresh-status" style="display:none;text-align:center;padding:8px;background:#fffbeb;border-radius:8px;margin-bottom:12px;font-size:13px;color:#92400e">
-  Sedang mengecek tagihan...
-</div>
-
+ 
+<div id="refresh-bar">&#x23F3; Sedang mengecek tagihan, mohon tunggu...</div>
+ 
 <%
-local pdam_tagihan = tonumber(data.pdam.tagihan) or 0
-local wifi_tagihan = tonumber(data.wifi.tagihan) or 0
-local pdam_lunas   = string.find((data.pdam.bayar_status or ""):lower(), "lunas") ~= nil
-local wifi_sudah   = (data.wifi.status_bayar or "") == "SUDAH DIBAYAR"
+local pdam_lunas    = (data.pdam.lunas or "0") == "1"
+local pdam_tg       = tonumber(data.pdam.tagihan)   or 0
+local pdam_tng      = tonumber(data.pdam.tunggakan) or 0
+local pdam_total    = tonumber(data.pdam.total_bayar) or 0
+local wifi_sudah    = (data.wifi.status_bayar or "") == "SUDAH DIBAYAR"
 %>
-
+ 
 <div class="tb-grid">
-
-<%# ══ KARTU PDAM ══════════════════════════════════════ %>
-<div class="card" id="card-pdam">
-  <div class="status-bar"></div>
+ 
+<%-- ══ KARTU PDAM ══════════════════════════════════════ --%>
+<div class="card">
+  <div class="card-top-bar bar-pdam"></div>
   <div class="card-head">
-    <div class="card-icon-wrap icon-pdam">&#x1F4A7;</div>
-    <div class="card-head-info">
+    <div class="card-icon icon-pdam">&#x1F4A7;</div>
+    <div class="card-info">
       <div class="card-name">PDAM Jakarta</div>
-      <div class="card-desc">PAM Jaya — Tagihan Air Bulanan</div>
+      <div class="card-desc">PAM Jaya &mdash; Tagihan Air Bulanan</div>
     </div>
     <span class="badge badge-<%=data.pdam.status%>" id="b-pdam"><%=data.pdam.status%></span>
   </div>
-
+ 
   <% if data.pdam.enabled == "1" then %>
     <% if data.pdam.status == "ok" then %>
       <div class="card-body">
-        <% if pdam_lunas then %>
-          <div class="amount-big amount-lunas">&#x2713; Tagihan Lunas</div>
+ 
+        <% if pdam_lunas and pdam_tng == 0 then %>
+          <div class="amount-box">
+            <div class="amount-lunas">&#x2713; Tagihan Lunas</div>
+            <div class="amount-label"><%=data.pdam.periode%></div>
+          </div>
         <% else %>
-          <div class="amount-big amount-bayar"><%=data.pdam.tagihan_str ~= "" and data.pdam.tagihan_str or ("Rp " .. data.pdam.tagihan)%></div>
+          <div class="amount-box">
+            <div class="amount-bayar"><%=data.pdam.tagihan_str ~= "" and data.pdam.tagihan_str or ("Rp "..data.pdam.tagihan)%></div>
+            <div class="amount-label">Tagihan <%=data.pdam.periode%></div>
+          </div>
         <% end %>
-
+ 
+        <% if pdam_tng > 0 then %>
+          <div class="tunggakan-box">
+            <div class="tunggakan-title">&#x26A0; Ada Tunggakan Belum Dibayar</div>
+            <div class="info-row" style="border:none;padding:2px 0">
+              <span class="info-lbl">Periode Tunggakan</span>
+              <span class="info-val"><%=data.pdam.period_tunggakan%></span>
+            </div>
+            <div class="info-row" style="border:none;padding:2px 0">
+              <span class="info-lbl">Total Tunggakan</span>
+              <span class="info-val" style="color:#ef4444"><%=data.pdam.tunggakan_str%></span>
+            </div>
+            <div class="divider"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13px;font-weight:700;color:#dc2626">Total Harus Dibayar</span>
+              <span class="tunggakan-total">Rp <%=data.pdam.total_bayar%></span>
+            </div>
+          </div>
+        <% end %>
+ 
+        <div class="divider"></div>
+ 
         <div class="info-row">
-          <span class="info-label">&#x1F464; Nama</span>
-          <span class="info-value"><%=data.pdam.nama%></span>
+          <span class="info-lbl">&#x1F464; Nama</span>
+          <span class="info-val"><%=data.pdam.nama%></span>
         </div>
         <div class="info-row">
-          <span class="info-label">&#x1F522; No. Pelanggan</span>
-          <span class="info-value"><%=data.pdam.nomor_pelanggan%></span>
+          <span class="info-lbl">&#x1F522; No. Pelanggan</span>
+          <span class="info-val"><%=data.pdam.nomor_pelanggan%></span>
         </div>
         <% if data.pdam.golongan ~= "" then %>
         <div class="info-row">
-          <span class="info-label">&#x1F3F7; Golongan</span>
-          <span class="info-value"><%=data.pdam.golongan%></span>
+          <span class="info-lbl">&#x1F3F7; Kode Tarif</span>
+          <span class="info-val"><%=data.pdam.golongan%></span>
         </div>
         <% end %>
-        <div class="info-row">
-          <span class="info-label">&#x1F4C5; Periode</span>
-          <span class="info-value"><%=data.pdam.periode%></span>
-        </div>
         <% if data.pdam.pemakaian ~= "" and data.pdam.pemakaian ~= "-" then %>
         <div class="info-row">
-          <span class="info-label">&#x1F6B0; Pemakaian</span>
-          <span class="info-value"><%=data.pdam.pemakaian%> m&sup3;</span>
+          <span class="info-lbl">&#x1F6B0; Kubik</span>
+          <span class="info-val"><%=data.pdam.pemakaian%> m&sup3;</span>
+        </div>
+        <% end %>
+        <% if data.pdam.stand_meter ~= "" then %>
+        <div class="info-row">
+          <span class="info-lbl">&#x1F4CF; Stand Meter</span>
+          <span class="info-val"><%=data.pdam.stand_meter%></span>
+        </div>
+        <% end %>
+        <% if data.pdam.jatuh_tempo ~= "" then %>
+        <div class="info-row">
+          <span class="info-lbl">&#x23F0; Jatuh Tempo</span>
+          <span class="info-val"><%=data.pdam.jatuh_tempo%></span>
         </div>
         <% end %>
         <div class="info-row">
-          <span class="info-label">&#x1F4B3; Status Bayar</span>
-          <span class="info-value">
-            <% if pdam_lunas then %>
+          <span class="info-lbl">&#x1F4B3; Status</span>
+          <span class="info-val">
+            <% if pdam_lunas and pdam_tng == 0 then %>
               <span class="pill-lunas">&#x2713; Lunas</span>
+            <% elseif pdam_tng > 0 then %>
+              <span class="pill-warn">&#x26A0; Ada Tunggakan</span>
             <% else %>
-              <span class="pill-belum">&#x26A0; <%=data.pdam.bayar_status%></span>
+              <span class="pill-belum">&#x26A0; Belum Lunas</span>
             <% end %>
           </span>
         </div>
+ 
       </div>
     <% elseif data.pdam.status == "error" then %>
-      <div class="card-body">
-        <div style="text-align:center;padding:20px;color:#ef4444">
-          <div style="font-size:32px">&#x26A0;</div>
-          <div style="font-size:13px;margin-top:8px">Gagal mengambil data</div>
-          <div style="font-size:11px;color:#9ca3af;margin-top:4px">Lihat Log untuk detail</div>
+      <div class="empty-state">
+        <div style="font-size:36px">&#x26A0;</div>
+        <div style="margin-top:8px;color:#ef4444">Gagal mengambil data</div>
+        <div style="font-size:12px;margin-top:4px">
+          <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/log")%>">Lihat Log &rarr;</a>
         </div>
       </div>
     <% else %>
-      <div class="card-body">
-        <div style="text-align:center;padding:20px;color:#9ca3af">
-          <div style="font-size:32px">&#x23F3;</div>
-          <div style="font-size:13px;margin-top:8px">Belum dicek</div>
-        </div>
+      <div class="empty-state">
+        <div style="font-size:36px">&#x23F3;</div>
+        <div style="margin-top:8px">Belum pernah dicek</div>
+        <div style="font-size:12px;margin-top:4px;color:#6b7280">Klik Refresh untuk cek sekarang</div>
       </div>
     <% end %>
   <% else %>
-    <div class="not-configured">
+    <div class="empty-state">
       Belum dikonfigurasi<br>
-      <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">
-        Buka Pengaturan &#x2192;
-      </a>
+      <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Buka Pengaturan &rarr;</a>
     </div>
   <% end %>
-
+ 
   <div class="card-foot">
     <span class="foot-time">
       <% if data.pdam.last_check_time ~= "" then %>
@@ -170,60 +213,66 @@ local wifi_sudah   = (data.wifi.status_bayar or "") == "SUDAH DIBAYAR"
         Belum pernah dicek
       <% end %>
     </span>
-    <button class="btn-sm btn-sm-blue" onclick="doRefresh('pdam')">
-      &#x1F504; Refresh
-    </button>
+    <button class="btn-sm" onclick="doRefresh('pdam')">&#x1F504; Refresh</button>
   </div>
 </div>
-
-<%# ══ KARTU WIFI ══════════════════════════════════════ %>
-<div class="card" id="card-wifi">
-  <div class="status-bar"></div>
+ 
+<%-- ══ KARTU WIFI ══════════════════════════════════════ --%>
+<div class="card">
+  <div class="card-top-bar bar-wifi"></div>
   <div class="card-head">
-    <div class="card-icon-wrap icon-wifi">&#x1F4F6;</div>
-    <div class="card-head-info">
+    <div class="card-icon icon-wifi">&#x1F4F6;</div>
+    <div class="card-info">
       <div class="card-name">WiFi MyRepublic</div>
-      <div class="card-desc">Tagihan Internet — via Email IMAP</div>
+      <div class="card-desc">Tagihan Internet &mdash; via Email IMAP</div>
     </div>
     <span class="badge badge-<%=data.wifi.status%>" id="b-wifi"><%=data.wifi.status%></span>
   </div>
-
+ 
   <% if data.wifi.enabled == "1" then %>
     <% if data.wifi.status == "ok" then %>
       <div class="card-body">
         <% if wifi_sudah then %>
-          <div class="amount-big amount-lunas">&#x2713; Sudah Dibayar</div>
+          <div class="amount-box">
+            <div class="amount-lunas">&#x2713; Sudah Dibayar</div>
+            <div class="amount-label"><%=data.wifi.tagihan_str%></div>
+          </div>
         <% else %>
-          <div class="amount-big amount-bayar"><%=data.wifi.tagihan_str%></div>
+          <div class="amount-box">
+            <div class="amount-bayar"><%=data.wifi.tagihan_str%></div>
+            <div class="amount-label">Total Tagihan</div>
+          </div>
         <% end %>
-
+ 
+        <div class="divider"></div>
+ 
         <div class="info-row">
-          <span class="info-label">&#x1F464; Nama</span>
-          <span class="info-value"><%=data.wifi.nama%></span>
+          <span class="info-lbl">&#x1F464; Nama</span>
+          <span class="info-val"><%=data.wifi.nama%></span>
         </div>
         <% if data.wifi.id_pelanggan ~= "" then %>
         <div class="info-row">
-          <span class="info-label">&#x1F194; ID Pelanggan</span>
-          <span class="info-value"><%=data.wifi.id_pelanggan%></span>
+          <span class="info-lbl">&#x1F194; ID Pelanggan</span>
+          <span class="info-val"><%=data.wifi.id_pelanggan%></span>
         </div>
         <% end %>
         <% if data.wifi.invoice ~= "" then %>
         <div class="info-row">
-          <span class="info-label">&#x1F4C4; Invoice</span>
-          <span class="info-value"><%=data.wifi.invoice%></span>
+          <span class="info-lbl">&#x1F4C4; Nomor Invoice</span>
+          <span class="info-val"><%=data.wifi.invoice%></span>
         </div>
         <% end %>
         <% if data.wifi.jatuh_tempo ~= "" then %>
         <div class="info-row">
-          <span class="info-label">&#x23F0; Jatuh Tempo</span>
-          <span class="info-value"><%=data.wifi.jatuh_tempo%></span>
+          <span class="info-lbl">&#x23F0; Jatuh Tempo</span>
+          <span class="info-val"><%=data.wifi.jatuh_tempo%></span>
         </div>
         <% end %>
         <div class="info-row">
-          <span class="info-label">&#x1F4B3; Status Bayar</span>
-          <span class="info-value">
+          <span class="info-lbl">&#x1F4B3; Status Bayar</span>
+          <span class="info-val">
             <% if wifi_sudah then %>
-              <span class="pill-lunas">&#x2713; Sudah Bayar</span>
+              <span class="pill-lunas">&#x2713; Sudah Dibayar</span>
             <% else %>
               <span class="pill-belum">&#x26A0; Belum Dibayar</span>
             <% end %>
@@ -231,30 +280,24 @@ local wifi_sudah   = (data.wifi.status_bayar or "") == "SUDAH DIBAYAR"
         </div>
       </div>
     <% elseif data.wifi.status == "error" then %>
-      <div class="card-body">
-        <div style="text-align:center;padding:20px;color:#ef4444">
-          <div style="font-size:32px">&#x26A0;</div>
-          <div style="font-size:13px;margin-top:8px">Gagal mengambil data</div>
-          <div style="font-size:11px;color:#9ca3af;margin-top:4px">Cek email &amp; App Password di Pengaturan</div>
-        </div>
+      <div class="empty-state">
+        <div style="font-size:36px">&#x26A0;</div>
+        <div style="margin-top:8px;color:#ef4444">Gagal mengambil data</div>
+        <div style="font-size:12px;margin-top:4px;color:#6b7280">Cek email &amp; App Password di Pengaturan</div>
       </div>
     <% else %>
-      <div class="card-body">
-        <div style="text-align:center;padding:20px;color:#9ca3af">
-          <div style="font-size:32px">&#x23F3;</div>
-          <div style="font-size:13px;margin-top:8px">Belum dicek</div>
-        </div>
+      <div class="empty-state">
+        <div style="font-size:36px">&#x23F3;</div>
+        <div style="margin-top:8px">Belum pernah dicek</div>
       </div>
     <% end %>
   <% else %>
-    <div class="not-configured">
+    <div class="empty-state">
       Belum dikonfigurasi<br>
-      <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">
-        Buka Pengaturan &#x2192;
-      </a>
+      <a href="<%=luci.dispatcher.build_url("admin/services/tagihan/settings")%>">Buka Pengaturan &rarr;</a>
     </div>
   <% end %>
-
+ 
   <div class="card-foot">
     <span class="foot-time">
       <% if data.wifi.last_check_time ~= "" then %>
@@ -263,23 +306,18 @@ local wifi_sudah   = (data.wifi.status_bayar or "") == "SUDAH DIBAYAR"
         Belum pernah dicek
       <% end %>
     </span>
-    <button class="btn-sm btn-sm-blue" onclick="doRefresh('wifi')">
-      &#x1F504; Refresh
-    </button>
+    <button class="btn-sm" onclick="doRefresh('wifi')">&#x1F504; Refresh</button>
   </div>
 </div>
-
-</div><%# end grid %>
-</div><%# end wrap %>
-
+ 
+</div><%-- end grid --%>
+</div><%-- end wrap --%>
+ 
 <script>
 var poll;
-function badge(s,v){
-  var e=document.getElementById('b-'+s);
-  if(e){e.className='badge badge-'+v;e.textContent=v;}
-}
+function badge(s,v){var e=document.getElementById('b-'+s);if(e){e.className='badge badge-'+v;e.textContent=v;}}
 function doRefresh(t){
-  document.getElementById('refresh-status').style.display='block';
+  document.getElementById('refresh-bar').style.display='block';
   if(t==='all'||t==='pdam')badge('pdam','loading');
   if(t==='all'||t==='wifi')badge('wifi','loading');
   clearInterval(poll);
@@ -287,7 +325,7 @@ function doRefresh(t){
     .then(function(r){return r.json();}).then(function(){
       var n=0;
       poll=setInterval(function(){
-        n++;if(n>25){clearInterval(poll);document.getElementById('refresh-status').style.display='none';return;}
+        n++;if(n>25){clearInterval(poll);document.getElementById('refresh-bar').style.display='none';return;}
         fetch('<%=luci.dispatcher.build_url("admin/services/tagihan/status")%>')
           .then(function(r){return r.json();}).then(function(d){
             var done=true;
@@ -298,7 +336,7 @@ function doRefresh(t){
             });
             if(done){
               clearInterval(poll);
-              document.getElementById('refresh-status').style.display='none';
+              document.getElementById('refresh-bar').style.display='none';
               setTimeout(function(){location.reload();},1500);
             }
           });
