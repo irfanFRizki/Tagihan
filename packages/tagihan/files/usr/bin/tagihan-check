@@ -180,7 +180,7 @@ def check_pdam():
             lunas = is_lunas(status_str, total_val, tunggakan_val)
  
             # Total yang harus dibayar = tagihan bulan ini + tunggakan
-            total_bayar = total_val + tunggakan_val
+            total_bayar = tunggakan_val
  
             log(f"[PDAM] Nama      : {nama_pel}")
             log(f"[PDAM] Periode   : {periode}")
