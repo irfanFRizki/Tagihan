@@ -1,20 +1,24 @@
-# /etc/config/tagihan
-# Konfigurasi Tagihan Bot - irfanFRizki
-
 config tagihan 'pdam'
     option enabled '0'
     option nomor_pelanggan ''
     option nama ''
     option tagihan '0'
+    option tagihan_str ''
+    option tunggakan '0'
+    option tunggakan_str ''
+    option total_bayar '0'
+    option period_tunggakan ''
     option periode ''
     option pemakaian ''
     option bayar_status ''
+    option lunas '0'
     option golongan ''
     option jatuh_tempo ''
+    option stand_meter ''
     option status 'belum_dicek'
     option last_update ''
     option last_check_time ''
-
+ 
 config tagihan 'wifi'
     option enabled '0'
     option email ''
@@ -29,7 +33,7 @@ config tagihan 'wifi'
     option status 'belum_dicek'
     option last_update ''
     option last_check_time ''
-
+ 
 config tagihan 'telegram'
     option enabled '0'
     option bot_token ''
@@ -40,7 +44,7 @@ config tagihan 'telegram'
     option schedule_hour '8'
     option schedule_minute '0'
     option schedule_day '1'
-
+ 
 config tagihan 'settings'
     option auto_check '1'
     option interval '6'
