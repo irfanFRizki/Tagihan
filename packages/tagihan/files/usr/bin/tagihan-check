@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# tagihan-check v3.0 - PDAM + WiFi IMAP
-
+# tagihan-check v3.1 - Fix status lunas + tunggakan PDAM
+ 
 import json, os, sys, time, subprocess, re
 import urllib.request, urllib.parse, urllib.error, ssl
 import imaplib, email as emaillib
 from email.header import decode_header
-
+ 
 LOG_FILE  = "/tmp/tagihan-last.log"
 CACHE_DIR = "/tmp/tagihan"
 os.makedirs(CACHE_DIR, exist_ok=True)
-
+ 
 ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode    = ssl.CERT_NONE
-
+ 
 _logs = []
-
+ 
 def log(msg):
-    ts   = time.strftime("%H:%M:%S")
+    ts = time.strftime("%H:%M:%S")
     line = f"[{ts}] {msg}"
     print(line, flush=True)
     _logs.append(line)
-
+ 
 def save_log():
     try:
         with open(LOG_FILE, "w") as f:
             f.write("\n".join(_logs) + "\n")
     except Exception:
         pass
-
+ 
 def uci_get(key, default=""):
     try:
         r = subprocess.run(["uci","-q","get",key],
@@ -36,49 +36,81 @@ def uci_get(key, default=""):
         return r.stdout.strip() if r.returncode==0 else default
     except Exception:
         return default
-
+ 
 def uci_set(key, value):
     try:
         subprocess.run(["uci","-q","set",f"{key}={value}"],
                        capture_output=True,timeout=5)
     except Exception:
         pass
-
+ 
 def uci_commit():
     try:
         subprocess.run(["uci","-q","commit","tagihan"],
                        capture_output=True,timeout=5)
     except Exception:
         pass
-
+ 
 def save_cache(name, data):
     try:
         with open(f"{CACHE_DIR}/{name}.json","w") as f:
             json.dump(data,f)
     except Exception:
         pass
-
+ 
 def parse_rp(s):
     try:
         clean = re.sub(r'[^0-9]', '', str(s))
         return int(clean) if clean else 0
     except Exception:
         return 0
-
+ 
 def fmt_rp(n):
     try:
         return "Rp {:,}".format(int(float(
             str(n).replace(",","").replace(".","")))).replace(",",".")
     except Exception:
         return str(n)
-
+ 
+def is_lunas(status_str, total_val, tunggakan_val):
+    """
+    Deteksi lunas dengan benar:
+    - 'Tagihan sudah lunas' → lunas (HANYA jika tidak ada tunggakan)
+    - 'Tagihan belum lunas' → BELUM lunas (kata 'lunas' ada tapi diawali 'belum')
+    - 'Belum Lunas'         → BELUM lunas
+    - tunggakan > 0         → SELALU belum lunas, apapun status string-nya
+    """
+    s = status_str.lower().strip()
+ 
+    # Tunggakan > 0 = pasti belum lunas, override apapun
+    if tunggakan_val > 0:
+        return False
+ 
+    # Cek kata 'belum' sebelum kata 'lunas'
+    if re.search(r'belum\s+lunas', s):
+        return False
+ 
+    # Cek status eksplisit belum bayar
+    if any(k in s for k in ['belum', 'unpaid', 'outstanding', 'tunggak']):
+        return False
+ 
+    # Cek kata 'lunas' atau 'paid' tanpa 'belum'
+    if any(k in s for k in ['lunas', 'paid', 'lunas', 'clear']):
+        return True
+ 
+    # Jika total = 0 dan tidak ada tunggakan, anggap lunas
+    if total_val == 0 and tunggakan_val == 0:
+        return True
+ 
+    return False
+ 
 def http_get(url, headers=None, timeout=25):
     h = {"User-Agent":"Mozilla/5.0","Accept":"application/json, */*"}
     if headers: h.update(headers)
     req = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx) as r:
         return r.read().decode("utf-8", errors="ignore")
-
+ 
 def http_post(url, data, headers=None, timeout=25):
     h = {"User-Agent":"Mozilla/5.0","Content-Type":"application/json","Accept":"application/json"}
     if headers: h.update(headers)
@@ -86,7 +118,7 @@ def http_post(url, data, headers=None, timeout=25):
     req  = urllib.request.Request(url, data=body, headers=h, method="POST")
     with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx) as r:
         return r.read().decode("utf-8", errors="ignore")
-
+ 
 def tg_send(text):
     if uci_get("tagihan.telegram.enabled") != "1": return
     token   = uci_get("tagihan.telegram.bot_token","")
@@ -98,10 +130,9 @@ def tg_send(text):
         log("[TG] Terkirim")
     except Exception as e:
         log(f"[TG] Gagal: {e}")
-
+ 
 # ══════════════════════════════════════════════
 # PDAM Jakarta (PAM Jaya)
-# API: /api/proxy/billing-check/west|east?idpel=
 # ══════════════════════════════════════════════
 def check_pdam():
     if uci_get("tagihan.pdam.enabled") != "1":
@@ -109,96 +140,117 @@ def check_pdam():
     nomor = uci_get("tagihan.pdam.nomor_pelanggan","").strip()
     if not nomor:
         return {"status":"error","message":"Nomor pelanggan belum diisi"}
-
+ 
     log(f"[PDAM] Cek nomor: {nomor}")
     base = "https://pelanggan.pamjaya.co.id"
-
+ 
     for region in ("west","east"):
         url = f"{base}/api/proxy/billing-check/{region}?idpel={nomor}"
         try:
-            log(f"[PDAM] Mencoba region {region}...")
+            log(f"[PDAM] Region {region}...")
             raw = http_get(url, headers={
                 "Accept":"application/json",
                 "Referer":f"{base}/id/cek-tagihan"
             })
+            log(f"[PDAM] Raw: {raw}")
             d = json.loads(raw)
-
-            nama      = d.get("namaPel","").strip()
-            periode   = d.get("period","")
-            total_str = d.get("total","Rp 0")
-            status_s  = d.get("status","")
-            tunggakan = d.get("tunggakan","Rp 0")
-            kubik     = d.get("kubik","-")
-            jt        = str(d.get("jatuhTempo") or "")
-            gol       = d.get("gol","")
-
-            if "tidak ditemukan" in status_s.lower():
+ 
+            # ── Ambil semua field dari response ───────
+            nama_pel      = d.get("namaPel","").strip()
+            no_pel        = d.get("noPel", nomor)
+            golongan      = d.get("gol","")
+            periode       = d.get("period","")
+            total_str     = d.get("total","Rp 0")        # tagihan bulan ini
+            status_str    = d.get("status","")
+            tunggakan_str = d.get("tunggakan","Rp 0")    # akumulasi tunggakan
+            period_tg     = d.get("periodTunggakan","-") # periode tunggakan
+            kubik         = d.get("kubik","-")
+            jt            = str(d.get("jatuhTempo") or "")
+            stand_awal    = d.get("standawal1") or d.get("standawal2") or ""
+            stand_akhir   = d.get("standakhir1") or d.get("standakhir2") or ""
+ 
+            if "tidak ditemukan" in status_str.lower() and not nama_pel:
                 log(f"[PDAM] Tidak ditemukan di region {region}")
                 continue
-
+ 
             total_val     = parse_rp(total_str)
-            tunggakan_val = parse_rp(tunggakan)
-            tagihan_val   = tunggakan_val if tunggakan_val > 0 else total_val
-
-            log(f"[PDAM] OK - {nama} | {total_str} | {status_s}")
+            tunggakan_val = parse_rp(tunggakan_str)
+ 
+            # ── Deteksi lunas dengan benar ────────────
+            lunas = is_lunas(status_str, total_val, tunggakan_val)
+ 
+            # Total yang harus dibayar = tagihan bulan ini + tunggakan
+            total_bayar = total_val + tunggakan_val
+ 
+            log(f"[PDAM] Nama      : {nama_pel}")
+            log(f"[PDAM] Periode   : {periode}")
+            log(f"[PDAM] Total     : {total_str} ({total_val})")
+            log(f"[PDAM] Tunggakan : {tunggakan_str} ({tunggakan_val})")
+            log(f"[PDAM] Status    : {status_str}")
+            log(f"[PDAM] Lunas     : {lunas}")
+            log(f"[PDAM] Total bayar: {fmt_rp(total_bayar)}")
+ 
             return {
-                "status":       "ok",
-                "nama":         nama,
-                "nomor":        nomor,
-                "golongan":     gol,
-                "tagihan":      tagihan_val,
-                "tagihan_str":  total_str,
-                "tunggakan":    tunggakan_val,
-                "periode":      periode,
-                "pemakaian":    kubik,
-                "jatuh_tempo":  jt,
-                "bayar_status": status_s,
-                "region":       region,
-                "last_update":  int(time.time()),
+                "status":          "ok",
+                "nama":            nama_pel,
+                "nomor":           no_pel,
+                "golongan":        golongan,
+                "tagihan":         total_val,        # tagihan bulan berjalan
+                "tagihan_str":     total_str,
+                "tunggakan":       tunggakan_val,    # tunggakan lama
+                "tunggakan_str":   tunggakan_str,
+                "period_tunggakan": period_tg,
+                "total_bayar":     total_bayar,      # total yang harus dibayar
+                "periode":         periode,
+                "pemakaian":       kubik,
+                "jatuh_tempo":     jt,
+                "bayar_status":    status_str,
+                "lunas":           lunas,
+                "stand_meter":     f"{stand_awal} - {stand_akhir}" if stand_awal else "",
+                "region":          region,
+                "last_update":     int(time.time()),
                 "last_check_time": time.strftime("%d/%m/%Y %H:%M")
             }
         except Exception as e:
             log(f"[PDAM] Error region {region}: {e}")
-
+ 
     return {"status":"error","message":"Kedua region gagal.","last_update":int(time.time())}
-
+ 
 # ══════════════════════════════════════════════
 # WiFi MyRepublic — IMAP Gmail
 # ══════════════════════════════════════════════
 def check_wifi():
     if uci_get("tagihan.wifi.enabled") != "1":
         return {"status":"disabled"}
-
     gmail    = uci_get("tagihan.wifi.email","").strip()
     app_pass = uci_get("tagihan.wifi.app_password","").strip()
     if not gmail or not app_pass:
         return {"status":"error","message":"Email/App Password belum diisi"}
-
-    log(f"[WiFi] Login IMAP Gmail: {gmail}")
+ 
+    log(f"[WiFi] Login IMAP: {gmail}")
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com", timeout=20)
         mail.login(gmail, app_pass)
         mail.select("inbox")
         log("[WiFi] Login berhasil")
-
+ 
         email_ids = []
         for f in ['FROM "no-reply@myrepublic.net.id"',
                   'FROM "billing@myrepublic.net.id"']:
             st, msgs = mail.search(None, f)
             if st=="OK" and msgs[0]:
                 email_ids = msgs[0].split()
-                log(f"[WiFi] {len(email_ids)} email dari {f}")
+                log(f"[WiFi] {len(email_ids)} email")
                 break
-
+ 
         if not email_ids:
             mail.logout()
-            return {"status":"error","message":"Tidak ada email tagihan MyRepublic di inbox.","last_update":int(time.time())}
-
+            return {"status":"error","message":"Tidak ada email tagihan MyRepublic.","last_update":int(time.time())}
+ 
         st, msg_data = mail.fetch(email_ids[-1], "(RFC822)")
         msg = emaillib.message_from_bytes(msg_data[0][1])
         mail.logout()
-
-        # Decode subject
+ 
         raw_subj = msg["subject"] or ""
         subject = ""
         for part, enc in decode_header(raw_subj):
@@ -207,8 +259,7 @@ def check_wifi():
             else:
                 subject += str(part)
         log(f"[WiFi] Subject: {subject}")
-
-        # Ambil HTML
+ 
         html = ""
         if msg.is_multipart():
             for part in msg.walk():
@@ -216,52 +267,43 @@ def check_wifi():
                     html += part.get_payload(decode=True).decode(errors="ignore")
         else:
             html = msg.get_payload(decode=True).decode(errors="ignore")
-
+ 
         text = re.sub(r'<[^<]+?>',' ',html)
         text = re.sub(r'\s+',' ',text).strip()
-
-        # Parse
-        nama_m    = re.search(r"IRFAN\s+FAJARRIZKI", text, re.IGNORECASE)
-        idpel_m   = re.search(r"ID\s+Pelanggan\s+(\d+)", text, re.IGNORECASE)
-        inv_m     = re.search(r"Invoice\s+(?:Number|No\.?)\s+(\S+)", text, re.IGNORECASE)
-        jt_m      = re.search(r"(?:Tanggal\s+)?Jatuh\s+Tempo\s+([0-9A-Za-z ]+?)(?:\s{2,}|$)", text, re.IGNORECASE)
-        tg_m      = re.search(r"TOTAL\s+([\d\.,]+)", text, re.IGNORECASE)
+ 
+        nama_m  = re.search(r"IRFAN\s+FAJARRIZKI", text, re.IGNORECASE)
+        idp_m   = re.search(r"ID\s+Pelanggan\s+(\d+)", text, re.IGNORECASE)
+        inv_m   = re.search(r"Invoice\s+(?:Number|No\.?)\s+(\S+)", text, re.IGNORECASE)
+        jt_m    = re.search(r"(?:Tanggal\s+)?Jatuh\s+Tempo\s+([0-9A-Za-z ]+?)(?:\s{2,}|$)", text, re.IGNORECASE)
+        tg_m    = re.search(r"TOTAL\s+([\d\.,]+)", text, re.IGNORECASE)
         if not tg_m:
-            tg_m  = re.search(r"Total\s+Tagihan\s+([\d\.,]+)", text, re.IGNORECASE)
+            tg_m = re.search(r"Total\s+Tagihan\s+([\d\.,]+)", text, re.IGNORECASE)
         if not tg_m:
-            tg_m  = re.search(r"Rp\.?\s*([\d\.,]{5,})", text, re.IGNORECASE)
-
-        nama_val    = nama_m.group(0).strip()        if nama_m   else "MyRepublic"
-        idpel_val   = idpel_m.group(1).strip()       if idpel_m  else ""
-        inv_val     = inv_m.group(1).strip()          if inv_m    else ""
-        jt_val      = jt_m.group(1).strip()[:30]     if jt_m     else ""
-        tg_str      = ("Rp " + tg_m.group(1))        if tg_m     else "Rp 0"
-        tg_val      = parse_rp(tg_m.group(1))        if tg_m     else 0
-        status_b    = "SUDAH DIBAYAR" if re.search(r"payment|diterima|paid|lunas", subject, re.IGNORECASE) else "BELUM DIBAYAR"
-
-        log(f"[WiFi] Nama: {nama_val}, Invoice: {inv_val}, Total: {tg_str}, Status: {status_b}")
-
-        return {
-            "status":       "ok",
-            "nama":         nama_val,
-            "id_pelanggan": idpel_val,
-            "invoice":      inv_val,
-            "jatuh_tempo":  jt_val,
-            "tagihan":      tg_val,
-            "tagihan_str":  tg_str,
-            "status_bayar": status_b,
-            "subject":      subject,
-            "last_update":  int(time.time()),
-            "last_check_time": time.strftime("%d/%m/%Y %H:%M")
-        }
-
+            tg_m = re.search(r"Rp\.?\s*([\d\.,]{5,})", text, re.IGNORECASE)
+ 
+        nama_val   = nama_m.group(0).strip() if nama_m  else "MyRepublic"
+        idp_val    = idp_m.group(1).strip()  if idp_m   else ""
+        inv_val    = inv_m.group(1).strip()   if inv_m   else ""
+        jt_val     = jt_m.group(1).strip()[:30] if jt_m else ""
+        tg_str     = ("Rp " + tg_m.group(1)) if tg_m   else "Rp 0"
+        tg_val     = parse_rp(tg_m.group(1)) if tg_m   else 0
+        status_b   = "SUDAH DIBAYAR" if re.search(r"payment|diterima|paid|lunas", subject, re.IGNORECASE) else "BELUM DIBAYAR"
+ 
+        log(f"[WiFi] Tagihan: {tg_str}, Status: {status_b}")
+        return {"status":"ok","nama":nama_val,"id_pelanggan":idp_val,
+                "invoice":inv_val,"jatuh_tempo":jt_val,
+                "tagihan":tg_val,"tagihan_str":tg_str,
+                "status_bayar":status_b,"subject":subject,
+                "last_update":int(time.time()),
+                "last_check_time":time.strftime("%d/%m/%Y %H:%M")}
+ 
     except imaplib.IMAP4.error as e:
         log(f"[WiFi] IMAP error: {e}")
         return {"status":"error","message":f"IMAP gagal: {e}","last_update":int(time.time())}
     except Exception as e:
         log(f"[WiFi] Error: {e}")
         return {"status":"error","message":str(e),"last_update":int(time.time())}
-
+ 
 # ══════════════════════════════════════════════
 # SAVE + NOTIFY
 # ══════════════════════════════════════════════
@@ -270,15 +312,23 @@ def save_and_notify(service, result):
     uci_set(f"tagihan.{service}.status", status)
     uci_set(f"tagihan.{service}.last_update", str(result.get("last_update",int(time.time()))))
     uci_set(f"tagihan.{service}.last_check_time", result.get("last_check_time",""))
-
+ 
     if service=="pdam" and status=="ok":
-        uci_set("tagihan.pdam.nama",        result.get("nama",""))
-        uci_set("tagihan.pdam.tagihan",     str(result.get("tagihan",0)))
-        uci_set("tagihan.pdam.periode",     result.get("periode",""))
-        uci_set("tagihan.pdam.pemakaian",   str(result.get("pemakaian","")))
-        uci_set("tagihan.pdam.bayar_status",result.get("bayar_status",""))
-        uci_set("tagihan.pdam.golongan",    result.get("golongan",""))
-        uci_set("tagihan.pdam.jatuh_tempo", result.get("jatuh_tempo",""))
+        uci_set("tagihan.pdam.nama",           result.get("nama",""))
+        uci_set("tagihan.pdam.tagihan",        str(result.get("tagihan",0)))
+        uci_set("tagihan.pdam.tagihan_str",    result.get("tagihan_str",""))
+        uci_set("tagihan.pdam.tunggakan",      str(result.get("tunggakan",0)))
+        uci_set("tagihan.pdam.tunggakan_str",  result.get("tunggakan_str",""))
+        uci_set("tagihan.pdam.total_bayar",    str(result.get("total_bayar",0)))
+        uci_set("tagihan.pdam.period_tunggakan", result.get("period_tunggakan",""))
+        uci_set("tagihan.pdam.periode",        result.get("periode",""))
+        uci_set("tagihan.pdam.pemakaian",      str(result.get("pemakaian","")))
+        uci_set("tagihan.pdam.bayar_status",   result.get("bayar_status",""))
+        uci_set("tagihan.pdam.lunas",          "1" if result.get("lunas") else "0")
+        uci_set("tagihan.pdam.golongan",       result.get("golongan",""))
+        uci_set("tagihan.pdam.jatuh_tempo",    result.get("jatuh_tempo",""))
+        uci_set("tagihan.pdam.stand_meter",    result.get("stand_meter",""))
+ 
     elif service=="wifi" and status=="ok":
         uci_set("tagihan.wifi.nama",         result.get("nama",""))
         uci_set("tagihan.wifi.id_pelanggan", result.get("id_pelanggan",""))
@@ -287,19 +337,29 @@ def save_and_notify(service, result):
         uci_set("tagihan.wifi.invoice",      result.get("invoice",""))
         uci_set("tagihan.wifi.jatuh_tempo",  result.get("jatuh_tempo",""))
         uci_set("tagihan.wifi.status_bayar", result.get("status_bayar",""))
-
+ 
     uci_commit()
     save_cache(service, result)
-
+ 
     if uci_get("tagihan.telegram.notify_on_check","1")=="1":
         label = {"pdam":"PDAM Jakarta","wifi":"WiFi MyRepublic"}.get(service,service)
         if status=="ok":
             if service=="pdam":
-                lunas = "lunas" in result.get("bayar_status","").lower()
-                msg = (f"<b>PDAM Jakarta</b>\n"
-                       f"Nama: {result.get('nama','')}\n"
-                       f"Periode: {result.get('periode','')}\n"
-                       f"{'Tagihan: Lunas' if lunas else 'Tagihan: '+fmt_rp(result.get('tagihan',0))}")
+                lunas      = result.get("lunas", False)
+                tunggakan  = result.get("tunggakan",0)
+                total_bayar = result.get("total_bayar",0)
+                msg = f"<b>PDAM Jakarta</b>\n"
+                msg += f"Nama: {result.get('nama','')}\n"
+                msg += f"Periode: {result.get('periode','')}\n"
+                if lunas and tunggakan == 0:
+                    msg += "Tagihan: <b>Lunas</b>"
+                else:
+                    msg += f"Tagihan Bulan Ini: <b>{result.get('tagihan_str','Rp 0')}</b>\n"
+                    if tunggakan > 0:
+                        msg += f"Tunggakan: <b>{result.get('tunggakan_str','')}</b>\n"
+                        msg += f"Periode Tunggakan: {result.get('period_tunggakan','')}\n"
+                        msg += f"TOTAL BAYAR: <b>{fmt_rp(total_bayar)}</b>\n"
+                    msg += f"Status: {result.get('bayar_status','')}"
             else:
                 sbayar = result.get("status_bayar","")
                 msg = (f"<b>WiFi MyRepublic</b>\n"
@@ -310,7 +370,7 @@ def save_and_notify(service, result):
             tg_send(msg)
         elif status=="error":
             tg_send(f"<b>{label}</b> Gagal: {result.get('message','')}")
-
+ 
 if __name__=="__main__":
     target = sys.argv[1] if len(sys.argv)>1 else "all"
     log(f"=== Tagihan Check: {target} ===")
