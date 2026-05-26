@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-# tagihan-notify v3.1 — Kirim ringkasan terjadwal ke Telegram
+# tagihan-notify v3.2 — Kirim ringkasan terjadwal ke Telegram
+# Perubahan v3.2: Jangan kirim jika semua tagihan aktif sudah lunas
 import subprocess, json, os, time
 import urllib.request, ssl
- 
+
 ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode    = ssl.CERT_NONE
- 
+
 def uci_get(key, default=""):
     try:
         r = subprocess.run(["uci","-q","get",key],
@@ -14,38 +15,44 @@ def uci_get(key, default=""):
         return r.stdout.strip() if r.returncode==0 else default
     except Exception:
         return default
- 
+
 def fmt_rp(n):
     try:
         return "Rp {:,}".format(int(float(
             str(n).replace(",","").replace(".","")))).replace(",",".")
     except Exception:
         return str(n)
- 
+
 def send(token, chat_id, text):
     url  = f"https://api.telegram.org/bot{token}/sendMessage"
     data = json.dumps({"chat_id":chat_id,"text":text,"parse_mode":"HTML"}).encode()
     req  = urllib.request.Request(url, data=data,
            headers={"Content-Type":"application/json"}, method="POST")
     urllib.request.urlopen(req, timeout=15, context=ssl_ctx)
- 
+
 if __name__ == "__main__":
     token   = uci_get("tagihan.telegram.bot_token","")
     chat_id = uci_get("tagihan.telegram.chat_id","")
     if not token or not chat_id:
         exit(0)
- 
+
     # Cek dulu, tunggu selesai
     os.system("/usr/bin/tagihan-check all >> /tmp/tagihan-last.log 2>&1")
     time.sleep(5)
- 
+
     now = time.strftime("%d %B %Y, %H:%M")
     lines = [f"<b>Ringkasan Tagihan</b>", f"<i>{now}</i>", ""]
- 
+
+    # ── Flag untuk deteksi apakah ada tagihan yang belum lunas ──
+    ada_tagihan_aktif  = False   # ada minimal 1 layanan enabled + status ok
+    ada_belum_lunas    = False   # ada minimal 1 tagihan yang belum lunas
+
     # PDAM
     if uci_get("tagihan.pdam.enabled") == "1":
         pdam_st = uci_get("tagihan.pdam.status","")
         if pdam_st == "ok":
+            ada_tagihan_aktif = True
+
             nama        = uci_get("tagihan.pdam.nama","")
             tagihan_str = uci_get("tagihan.pdam.tagihan_str","Rp 0")
             tunggakan   = int(uci_get("tagihan.pdam.tunggakan","0") or 0)
@@ -56,11 +63,14 @@ if __name__ == "__main__":
             period_tg   = uci_get("tagihan.pdam.period_tunggakan","")
             lunas       = uci_get("tagihan.pdam.lunas","0") == "1"
             jt          = uci_get("tagihan.pdam.jatuh_tempo","")
- 
+
+            if not (lunas and tunggakan == 0):
+                ada_belum_lunas = True
+
             lines.append("💧 <b>PDAM Jakarta (PAM Jaya)</b>")
             lines.append(f"   👤 {nama}")
             lines.append(f"   📅 Periode: {periode}")
- 
+
             if lunas and tunggakan == 0:
                 lines.append("   ✅ <b>Tagihan Lunas</b>")
             else:
@@ -73,18 +83,23 @@ if __name__ == "__main__":
                     lines.append(f"   ⏰ Jatuh Tempo: {jt}")
                 lines.append(f"   ❗ Status: {bayar_st}")
             lines.append("")
- 
+
     # WiFi
     if uci_get("tagihan.wifi.enabled") == "1":
         wifi_st = uci_get("tagihan.wifi.status","")
         if wifi_st == "ok":
+            ada_tagihan_aktif = True
+
             nama     = uci_get("tagihan.wifi.nama","")
             tg_str   = uci_get("tagihan.wifi.tagihan_str","")
             invoice  = uci_get("tagihan.wifi.invoice","")
             jt       = uci_get("tagihan.wifi.jatuh_tempo","")
             sbayar   = uci_get("tagihan.wifi.status_bayar","")
             sudah    = sbayar == "SUDAH DIBAYAR"
- 
+
+            if not sudah:
+                ada_belum_lunas = True
+
             lines.append("📶 <b>WiFi MyRepublic</b>")
             lines.append(f"   👤 {nama}")
             if invoice: lines.append(f"   📄 Invoice: {invoice}")
@@ -95,9 +110,18 @@ if __name__ == "__main__":
                 lines.append(f"   💰 <b>{tg_str}</b>")
                 lines.append("   ❗ Belum Dibayar")
             lines.append("")
- 
+
     lines.extend(["─────────────────", "🤖 <i>Tagihan Bot - irfanFRizki</i>"])
- 
+
+    # ── Cek: kirim hanya jika ada tagihan belum lunas ──
+    if not ada_tagihan_aktif:
+        print("Tidak ada layanan aktif, notifikasi dibatalkan.")
+        exit(0)
+
+    if not ada_belum_lunas:
+        print("Semua tagihan lunas, notifikasi dibatalkan.")
+        exit(0)
+
     try:
         send(token, chat_id, "\n".join(lines))
         print("Notifikasi terkirim")
