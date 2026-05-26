@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# tagihan-check v3.1 - Fix status lunas + tunggakan PDAM
+# tagihan-check v3.2 - Fix notify_on_check lunas, nama WiFi, duplikat keyword, jt_val
  
 import json, os, sys, time, subprocess, re
 import urllib.request, urllib.parse, urllib.error, ssl
@@ -95,7 +95,7 @@ def is_lunas(status_str, total_val, tunggakan_val):
         return False
  
     # Cek kata 'lunas' atau 'paid' tanpa 'belum'
-    if any(k in s for k in ['lunas', 'paid', 'lunas', 'clear']):
+    if any(k in s for k in ['lunas', 'paid', 'clear']):
         return True
  
     # Jika total = 0 dan tidak ada tunggakan, anggap lunas
@@ -271,7 +271,6 @@ def check_wifi():
         text = re.sub(r'<[^<]+?>',' ',html)
         text = re.sub(r'\s+',' ',text).strip()
  
-        nama_m  = re.search(r"IRFAN\s+FAJARRIZKI", text, re.IGNORECASE)
         idp_m   = re.search(r"ID\s+Pelanggan\s+(\d+)", text, re.IGNORECASE)
         inv_m   = re.search(r"Invoice\s+(?:Number|No\.?)\s+(\S+)", text, re.IGNORECASE)
         jt_m    = re.search(r"(?:Tanggal\s+)?Jatuh\s+Tempo\s+([0-9A-Za-z ]+?)(?:\s{2,}|$)", text, re.IGNORECASE)
@@ -280,11 +279,17 @@ def check_wifi():
             tg_m = re.search(r"Total\s+Tagihan\s+([\d\.,]+)", text, re.IGNORECASE)
         if not tg_m:
             tg_m = re.search(r"Rp\.?\s*([\d\.,]{5,})", text, re.IGNORECASE)
- 
-        nama_val   = nama_m.group(0).strip() if nama_m  else "MyRepublic"
+
+        # Nama: baca dari UCI dulu, fallback ke greeting di email, lalu "MyRepublic"
+        nama_uci = uci_get("tagihan.wifi.nama_pelanggan","").strip()
+        if nama_uci:
+            nama_val = nama_uci
+        else:
+            nama_m   = re.search(r"(?:Yth\.?|Dear|Kepada)\s+([A-Z][A-Za-z ]{3,40})", text)
+            nama_val = nama_m.group(1).strip() if nama_m else "MyRepublic"
         idp_val    = idp_m.group(1).strip()  if idp_m   else ""
         inv_val    = inv_m.group(1).strip()   if inv_m   else ""
-        jt_val     = jt_m.group(1).strip()[:30] if jt_m else ""
+        jt_val     = re.sub(r'\s+', ' ', jt_m.group(1).strip())[:30] if jt_m else ""
         tg_str     = ("Rp " + tg_m.group(1)) if tg_m   else "Rp 0"
         tg_val     = parse_rp(tg_m.group(1)) if tg_m   else 0
         status_b   = "SUDAH DIBAYAR" if re.search(r"payment|diterima|paid|lunas", subject, re.IGNORECASE) else "BELUM DIBAYAR"
@@ -345,23 +350,28 @@ def save_and_notify(service, result):
         label = {"pdam":"PDAM Jakarta","wifi":"WiFi MyRepublic"}.get(service,service)
         if status=="ok":
             if service=="pdam":
-                lunas      = result.get("lunas", False)
-                tunggakan  = result.get("tunggakan",0)
+                lunas       = result.get("lunas", False)
+                tunggakan   = result.get("tunggakan",0)
                 total_bayar = result.get("total_bayar",0)
-                msg = f"<b>PDAM Jakarta</b>\n"
+                # Skip notif jika lunas — konsisten dengan tagihan-notify
+                if lunas and tunggakan == 0:
+                    log("[TG] PDAM lunas, skip notify_on_check")
+                    return
+                msg  = f"<b>PDAM Jakarta</b>\n"
                 msg += f"Nama: {result.get('nama','')}\n"
                 msg += f"Periode: {result.get('periode','')}\n"
-                if lunas and tunggakan == 0:
-                    msg += "Tagihan: <b>Lunas</b>"
-                else:
-                    msg += f"Tagihan Bulan Ini: <b>{result.get('tagihan_str','Rp 0')}</b>\n"
-                    if tunggakan > 0:
-                        msg += f"Tunggakan: <b>{result.get('tunggakan_str','')}</b>\n"
-                        msg += f"Periode Tunggakan: {result.get('period_tunggakan','')}\n"
-                        msg += f"TOTAL BAYAR: <b>{fmt_rp(total_bayar)}</b>\n"
-                    msg += f"Status: {result.get('bayar_status','')}"
+                msg += f"Tagihan Bulan Ini: <b>{result.get('tagihan_str','Rp 0')}</b>\n"
+                if tunggakan > 0:
+                    msg += f"Tunggakan: <b>{result.get('tunggakan_str','')}</b>\n"
+                    msg += f"Periode Tunggakan: {result.get('period_tunggakan','')}\n"
+                    msg += f"TOTAL BAYAR: <b>{fmt_rp(total_bayar)}</b>\n"
+                msg += f"Status: {result.get('bayar_status','')}"
             else:
                 sbayar = result.get("status_bayar","")
+                # Skip notif jika WiFi sudah dibayar
+                if sbayar == "SUDAH DIBAYAR":
+                    log("[TG] WiFi sudah dibayar, skip notify_on_check")
+                    return
                 msg = (f"<b>WiFi MyRepublic</b>\n"
                        f"Nama: {result.get('nama','')}\n"
                        f"Invoice: {result.get('invoice','')}\n"
